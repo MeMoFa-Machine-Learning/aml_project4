@@ -158,8 +158,7 @@ def main(debug=False, outfile="out.csv"):
     emg_mean = np.mean(train_data_emg)
     train_data_emg -= emg_mean
 
-    # Pre-processing step: Savitzky-Golay filtering
-    # smoothed_train = list(map(lambda x: savgol_filter(x, window_length=31, polyorder=8), train_data_x))
+    # Pre-processing step: Butterworth filtering
     train_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
     train_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
     train_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
@@ -186,9 +185,21 @@ def main(debug=False, outfile="out.csv"):
     test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
     logging.info("Finished reading in data.")
 
-    # Pre-processing step: Savitzky-Golay filtering
-    # smoothed_test = list(map(lambda x: savgol_filter(x, window_length=31, polyorder=8), test_data_x))
-    # smoothed_test = list(map(lambda x: butter_lowpass_filter(x, 70, 300, 8), test_data_x))
+    # Pre-processing step: Butterworth filtering
+    test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
+    test_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
+    test_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
+    smoothed_eeg1_test = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1))
+
+    test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
+    test_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
+    test_data_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
+    smoothed_eeg2_test = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2))
+
+    test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
+    test_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
+    test_data_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
+    smoothed_emg_test = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg))
 
     # Extract features of testing set
     logging.info("Extracting features...")
