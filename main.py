@@ -84,9 +84,9 @@ def main(debug=False, outfile="out.csv"):
 
     # Load training data
     logging.info("Reading in training data...")
-    train_data_eeg1 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug)
-    train_data_eeg2 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), debug=debug)
-    train_data_emg = read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), debug=debug)
+    train_data_eeg1 = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug), dtype=np.float64)
+    train_data_eeg2 = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), debug=debug), dtype=np.float64)
+    train_data_emg = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), debug=debug), dtype=np.float64)
     train_data_y = pd.read_csv(ospath.join(training_data_dir, "train_labels.csv"), delimiter=",")["y"]
     if debug:
         train_data_y = train_data_y.head(first_n_lines_input)
@@ -94,13 +94,13 @@ def main(debug=False, outfile="out.csv"):
     logging.info("Finished reading in data.")
 
     # Pre-processing step: mean subtraction
-    eeg1_mean = np.mean(train_data_eeg1)
+    eeg1_mean = np.mean(train_data_eeg1, axis=0)
     train_data_eeg1 -= eeg1_mean
 
-    eeg2_mean = np.mean(train_data_eeg2)
+    eeg2_mean = np.mean(train_data_eeg2, axis=0)
     train_data_eeg2 -= eeg2_mean
 
-    emg_mean = np.mean(train_data_emg)
+    emg_mean = np.mean(train_data_emg, axis=0)
     train_data_emg -= emg_mean
 
     # Pre-processing step: Savitzky-Golay filtering
