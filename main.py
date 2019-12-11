@@ -5,7 +5,7 @@ import numpy as np
 from os import makedirs
 from itertools import tee
 from csv import reader
-import biosppy.signals.ecg as ecg
+import biosppy.signals.eeg as eeg
 from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
@@ -76,6 +76,47 @@ def butter_highpass_filter(data, cutoff, fs, order):
     y = lfilter(b, a, data)
     return y
 
+
+def extract_manual_features(eeg1, eeg2, emg):
+    manual_features_array = []
+    for i in enumerate(tqdm(eeg1)):
+        eeg.eeg(raw_ecg, sampling_rate=180, show=False)
+        mean_template = np.mean(templates, axis=0)
+
+        feature_extracted_samples = []
+        rr_interval_statistics = extract_rr_interval(rpeaks)
+        feature_extracted_samples.append(rr_interval_statistics[0])  # average RR interval
+        feature_extracted_samples.append(rr_interval_statistics[1])  # median RR interval
+        feature_extracted_samples.append(rr_interval_statistics[2])  # IQR RR interval
+        feature_extracted_samples.append(average_r_amplitude(filtered, rpeaks) - median_r_amplitude(filtered, rpeaks))
+        feature_extracted_samples.append(std_r_amplitude(filtered, rpeaks))  # standard deviation R amplitude
+        feature_extracted_samples.append(iqr_r_amplitude(filtered, rpeaks))  # IQR R amplitude
+        feature_extracted_samples.append(ecg_domain(mean_template))
+        # average peak amplitudes and indices
+        p_peak = extract_p_peak(mean_template)
+        t_peak = extract_t_peak(mean_template)
+        r_peak = extract_r_peak(mean_template)
+        feature_extracted_samples.append(p_peak[0])  # average amplitude of P peak
+        feature_extracted_samples.append(t_peak[0])  # average amplitude of T peak
+        feature_extracted_samples.append(r_peak[1] - p_peak[1])  # average PR interval
+        feature_extracted_samples.append(t_peak[1] - r_peak[1])  # average RT interval
+        # slope of P peak: a1
+        feature_extracted_samples.append((p_peak[0] - mean_template[p_peak[1] - 2]) / (p_peak[1] - (p_peak[1] - 2)))
+        # slope of P peak: a2
+        feature_extracted_samples.append((p_peak[0] - mean_template[p_peak[1] + 2]) / (p_peak[1] - (p_peak[1] + 2)))
+        # slope of R peak: a3
+        feature_extracted_samples.append((r_peak[0] - mean_template[r_peak[1] - 2]) / (r_peak[1] - (r_peak[1] - 2)))
+        # slope of R peak: a4
+        feature_extracted_samples.append((r_peak[0] - mean_template[r_peak[1] + 2]) / (r_peak[1] - (r_peak[1] + 2)))
+        # slope of T peak: a5
+        feature_extracted_samples.append((t_peak[0] - mean_template[t_peak[1] - 2]) / (t_peak[1] - (t_peak[1] - 2)))
+        # slope of T peak: a6
+        feature_extracted_samples.append((t_peak[0] - mean_template[t_peak[1] + 2]) / (t_peak[1] - (t_peak[1] + 2)))
+
+        manual_features_array.append(feature_extracted_samples)
+    return np.array(manual_features_array)
+
+
 def main(debug=False, outfile="out.csv"):
     output_pathname = "output"
     output_filepath = ospath.join(output_pathname, outfile)
@@ -84,9 +125,9 @@ def main(debug=False, outfile="out.csv"):
 
     # Load training data
     logging.info("Reading in training data...")
-    train_data_eeg1 = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug), dtype=np.float64)
-    train_data_eeg2 = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), debug=debug), dtype=np.float64)
-    train_data_emg = np.array(read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), debug=debug), dtype=np.float64)
+    train_data_eeg1 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug)
+    train_data_eeg2 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), debug=debug)
+    train_data_emg = read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), debug=debug)
     train_data_y = pd.read_csv(ospath.join(training_data_dir, "train_labels.csv"), delimiter=",")["y"]
     if debug:
         train_data_y = train_data_y.head(first_n_lines_input)
@@ -94,13 +135,13 @@ def main(debug=False, outfile="out.csv"):
     logging.info("Finished reading in data.")
 
     # Pre-processing step: mean subtraction
-    eeg1_mean = np.mean(train_data_eeg1, axis=0)
+    eeg1_mean = np.mean(train_data_eeg1)
     train_data_eeg1 -= eeg1_mean
 
-    eeg2_mean = np.mean(train_data_eeg2, axis=0)
+    eeg2_mean = np.mean(train_data_eeg2)
     train_data_eeg2 -= eeg2_mean
 
-    emg_mean = np.mean(train_data_emg, axis=0)
+    emg_mean = np.mean(train_data_emg)
     train_data_emg -= emg_mean
 
     # Pre-processing step: Savitzky-Golay filtering
@@ -113,6 +154,8 @@ def main(debug=False, outfile="out.csv"):
 
     train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
     smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
+
+
 
     # Extract features of training set
     logging.info("Extracting features...")
