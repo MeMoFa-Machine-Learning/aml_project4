@@ -6,6 +6,7 @@ from os import makedirs
 from itertools import tee
 from csv import reader
 import biosppy.signals.eeg as eeg
+import biosppy.signals.emg as emg
 from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
@@ -21,6 +22,7 @@ from statistics import median as pymedian
 from scipy.stats import entropy as sci_entropy
 import pywt
 from collections import Counter
+from helpers.helpers import EegStore, EmgStore
 
 import logging
 
@@ -77,41 +79,14 @@ def butter_highpass_filter(data, cutoff, fs, order):
     return y
 
 
-def extract_manual_features(eeg1, eeg2, emg):
+def extract_manual_features(eeg1, eeg2, emg1):
     manual_features_array = []
-    for i in enumerate(tqdm(eeg1)):
-        eeg.eeg(raw_ecg, sampling_rate=180, show=False)
-        mean_template = np.mean(templates, axis=0)
+    for i in tqdm(range(0, len(eeg1))):
+        eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=False))
+        eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=False))
+        emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False))
 
-        feature_extracted_samples = []
-        rr_interval_statistics = extract_rr_interval(rpeaks)
-        feature_extracted_samples.append(rr_interval_statistics[0])  # average RR interval
-        feature_extracted_samples.append(rr_interval_statistics[1])  # median RR interval
-        feature_extracted_samples.append(rr_interval_statistics[2])  # IQR RR interval
-        feature_extracted_samples.append(average_r_amplitude(filtered, rpeaks) - median_r_amplitude(filtered, rpeaks))
-        feature_extracted_samples.append(std_r_amplitude(filtered, rpeaks))  # standard deviation R amplitude
-        feature_extracted_samples.append(iqr_r_amplitude(filtered, rpeaks))  # IQR R amplitude
-        feature_extracted_samples.append(ecg_domain(mean_template))
-        # average peak amplitudes and indices
-        p_peak = extract_p_peak(mean_template)
-        t_peak = extract_t_peak(mean_template)
-        r_peak = extract_r_peak(mean_template)
-        feature_extracted_samples.append(p_peak[0])  # average amplitude of P peak
-        feature_extracted_samples.append(t_peak[0])  # average amplitude of T peak
-        feature_extracted_samples.append(r_peak[1] - p_peak[1])  # average PR interval
-        feature_extracted_samples.append(t_peak[1] - r_peak[1])  # average RT interval
-        # slope of P peak: a1
-        feature_extracted_samples.append((p_peak[0] - mean_template[p_peak[1] - 2]) / (p_peak[1] - (p_peak[1] - 2)))
-        # slope of P peak: a2
-        feature_extracted_samples.append((p_peak[0] - mean_template[p_peak[1] + 2]) / (p_peak[1] - (p_peak[1] + 2)))
-        # slope of R peak: a3
-        feature_extracted_samples.append((r_peak[0] - mean_template[r_peak[1] - 2]) / (r_peak[1] - (r_peak[1] - 2)))
-        # slope of R peak: a4
-        feature_extracted_samples.append((r_peak[0] - mean_template[r_peak[1] + 2]) / (r_peak[1] - (r_peak[1] + 2)))
-        # slope of T peak: a5
-        feature_extracted_samples.append((t_peak[0] - mean_template[t_peak[1] - 2]) / (t_peak[1] - (t_peak[1] - 2)))
-        # slope of T peak: a6
-        feature_extracted_samples.append((t_peak[0] - mean_template[t_peak[1] + 2]) / (t_peak[1] - (t_peak[1] + 2)))
+        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg_params.filtered[0]]
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
@@ -141,24 +116,23 @@ def main(debug=False, outfile="out.csv"):
     eeg2_mean = np.mean(train_data_eeg2)
     train_data_eeg2 -= eeg2_mean
 
-    emg_mean = np.mean(train_data_emg)
-    train_data_emg -= emg_mean
+    # emg_mean = np.mean(train_data_emg)
+    # train_data_emg -= emg_mean
 
     # Pre-processing step: Savitzky-Golay filtering
-    # smoothed_train = list(map(lambda x: savgol_filter(x, window_length=31, polyorder=8), train_data_x))
     train_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
-    smoothed_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
+    train_smoothed_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
 
     train_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg2))
-    smoothed_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
+    train_smoothed_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
 
-    train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
-    smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
-
-
+    # train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
+    # train_smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
+    train_smoothed_emg = train_data_emg
 
     # Extract features of training set
     logging.info("Extracting features...")
+    x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg)
     logging.info("Finished extracting features")
 
     # Load raw ECG testing data
@@ -169,15 +143,22 @@ def main(debug=False, outfile="out.csv"):
     logging.info("Finished reading in data.")
 
     # Pre-processing step: Savitzky-Golay filtering
-    # smoothed_test = list(map(lambda x: savgol_filter(x, window_length=31, polyorder=8), test_data_x))
-    # smoothed_test = list(map(lambda x: butter_lowpass_filter(x, 70, 300, 8), test_data_x))
+    test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
+    test_smoothed_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
+
+    test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
+    test_smoothed_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
+
+    test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
+    test_smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
 
     # Extract features of testing set
     logging.info("Extracting features...")
+    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg)
     logging.info("Finished extracting features")
 
     # Pre-processing step for meta-feature calculation: StandardScaler
-    # x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
+    x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
 
     # Prepare results dataframe
     # results = np.zeros((x_test_fsel.shape[0], 2))
