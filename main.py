@@ -79,7 +79,21 @@ def butter_highpass_filter(data, cutoff, fs, order):
     return y
 
 
-def extract_manual_features(eeg1, eeg2, emg1):
+def butter_bandstop(lowcut, highcut, fs, order=5):
+    nyq = 0.5 * fs  # Nyquist frequeny is half the sampling frequency
+    normal_lowcut = lowcut / nyq
+    normal_highcut = highcut / nyq
+    b, a = butter(N=order, Wn=[normal_lowcut, normal_highcut], btype='bandstop', analog=False, output='ba')
+    return b, a
+
+
+def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandstop(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
+
+def extract_manual_features(eeg1, eeg2, emg):
     manual_features_array = []
     for i in tqdm(range(0, len(eeg1))):
         eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=False))
@@ -119,16 +133,21 @@ def main(debug=False, outfile="out.csv"):
     # emg_mean = np.mean(train_data_emg)
     # train_data_emg -= emg_mean
 
-    # Pre-processing step: Savitzky-Golay filtering
+    # Pre-processing step: Butterworth filtering
     train_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
-    train_smoothed_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
+    train_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
+    train_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
+    train_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg1))
 
     train_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg2))
-    train_smoothed_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
+    train_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
+    train_data_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg2))
+    train_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg2))
 
-    # train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
-    # train_smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
-    train_smoothed_emg = train_data_emg
+    train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
+    train_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
+    train_data_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_emg))
+    train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_emg))
 
     # Extract features of training set
     logging.info("Extracting features...")
@@ -142,15 +161,21 @@ def main(debug=False, outfile="out.csv"):
     test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
     logging.info("Finished reading in data.")
 
-    # Pre-processing step: Savitzky-Golay filtering
+    # Pre-processing step: Butterworth filtering
     test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
-    test_smoothed_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
+    test_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
+    test_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
+    test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1))
 
     test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
-    test_smoothed_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
+    test_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
+    test_data_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
+    test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2))
 
     test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
-    test_smoothed_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
+    test_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
+    test_data_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
+    test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg))
 
     # Extract features of testing set
     logging.info("Extracting features...")
