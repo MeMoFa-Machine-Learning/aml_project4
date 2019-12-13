@@ -99,7 +99,7 @@ def extract_manual_features(eeg1, eeg2, emg1):
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
-        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg1[0][0]]
+        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg1[i][0]]
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
