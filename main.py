@@ -7,7 +7,6 @@ from itertools import tee
 from csv import reader
 import biosppy.signals.eeg as eeg
 import biosppy.signals.emg as emg
-from sklearn.model_selection import train_test_split
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
 from sklearn.ensemble import RandomForestClassifier
@@ -93,17 +92,27 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
     return y
 
 
-def extract_manual_features(eeg1, eeg2, emg):
+def extract_manual_features(eeg1, eeg2, emg1):
     manual_features_array = []
     for i in tqdm(range(0, len(eeg1))):
         eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=False))
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=False))
-        emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False))
+        # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
-        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg_params.filtered[0]]
+        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg1[0][0]]
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
+
+
+def train_test_split_by_indivdiual(x, y, debug=False):
+    if debug:
+        hold_out_start_i = int(first_n_lines_input * 2 / 3)
+    else:
+        hold_out_start_i = 43200
+    x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
+    x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
+    return x_gs, y_gs, x_ho, y_ho
 
 
 def main(debug=False, outfile="out.csv"):
@@ -130,24 +139,24 @@ def main(debug=False, outfile="out.csv"):
     eeg2_mean = np.mean(train_data_eeg2)
     train_data_eeg2 -= eeg2_mean
 
-    # emg_mean = np.mean(train_data_emg)
-    # train_data_emg -= emg_mean
+    emg_mean = np.mean(train_data_emg)
+    train_data_emg -= emg_mean
 
     # Pre-processing step: Butterworth filtering
     train_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
     train_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
-    train_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
-    train_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg1))
+    train_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
+    # train_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg1)) TODO: Fix bug
 
     train_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg2))
     train_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
-    train_data_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg2))
-    train_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg2))
+    train_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg2))
+    # train_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg2)) TODO: Fix bug
 
     train_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
     train_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
-    train_data_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_emg))
-    train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_emg))
+    train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_emg))
+    # train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_emg)) TODO: Fix bug
 
     # Extract features of training set
     logging.info("Extracting features...")
@@ -164,18 +173,18 @@ def main(debug=False, outfile="out.csv"):
     # Pre-processing step: Butterworth filtering
     test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
     test_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
-    test_data_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
-    test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1))
+    test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
+    # test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1)) TODO: Fix bug
 
     test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
     test_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
-    test_data_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
-    test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2))
+    test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
+    # test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2)) TODO: Fix bug
 
     test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
     test_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
-    test_data_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
-    test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg))
+    test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
+    # test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg)) TODO: Fix bug
 
     # Extract features of testing set
     logging.info("Extracting features...")
@@ -185,16 +194,92 @@ def main(debug=False, outfile="out.csv"):
     # Pre-processing step for meta-feature calculation: StandardScaler
     x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
 
+    # Grid search
+    max_depth = [3] if debug else [7, 9, 11, ]
+    min_samples_split = [5] if debug else [2, 3, 4, 6, 8]
+    n_estimators = [6] if debug else [50, 100, 200, 350, 500]
+
+    knn_neighbors = [3] if debug else [3, 5, 7]
+    knn_weights = ['uniform'] if debug else ['uniform', 'distance']
+    knn_algorithm = ['brute'] if debug else ['kd_tree', ]
+    knn_p = [2] if debug else [1, 2, 3]
+    knn_leaf_size = [30] if debug else [20, 30, 40]
+
+    k_best_features = [x_train_fsel.shape[1]] if debug else list(
+        np.linspace(start=5, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
+
+    models = [
+        {
+            'model': RandomForestClassifier,
+            'parameters': {
+                'fs__k': k_best_features,
+                'cm__criterion': ['entropy', 'gini'],
+                'cm__max_depth': max_depth,
+                'cm__min_samples_split': min_samples_split,
+                'cm__n_estimators': n_estimators,
+                'cm__class_weight': ['balanced'],
+            }
+        },
+        {
+            'model': KNC,
+            'parameters': {
+                'fs__k': k_best_features,
+                'cm__n_neighbors': knn_neighbors,
+                'cm__weights': knn_weights,
+                'cm__algorithm': knn_algorithm,
+                'cm__leaf_size': knn_leaf_size,
+                'cm__p': knn_p
+            }
+        }
+    ]
+
+    # Perform cross-validation
+    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_indivdiual(x_train_fsel, y_train_orig, debug=debug)
+
+    best_models = []
+    for model in models:
+        pl = Pipeline([('fs', SelectKBest()), ('cm', model['model']())], memory=".")
+        kfold = StratifiedKFold(n_splits=15, shuffle=True, random_state=6)
+
+        # C-support vector classification
+        grid_search = GridSearchCV(pl, model['parameters'], scoring="f1_micro", n_jobs=-1, cv=kfold, verbose=1)
+        grid_result = grid_search.fit(x_train_gs, y_train_gs)
+        # Calculate statistics and calculate on hold-out
+        logging.info(
+            "Best for model %s: %f using %s" % (str(model['model']), grid_result.best_score_, grid_result.best_params_))
+        y_ho_pred = grid_search.predict(x_ho)
+        hold_out_score = f1_score(y_ho_pred, y_ho, average='micro')
+        best_models.append((hold_out_score, grid_result.best_params_, model['model']))
+        logging.info("Best score on hold-out: {}".format(hold_out_score))
+
+    # Pick best params
+    final_model_params_i = int(np.argmax(np.array(best_models)[:, 0]))
+    final_model_type = best_models[final_model_params_i][2]
+    final_model_params = best_models[final_model_params_i][1]
+    logging.info("Picked the following model {} with params: {}".format(str(final_model_type), final_model_params))
+
+    # Fit final model
+    logging.info("Fitting the final model...")
+    final_model = Pipeline([('fs', SelectKBest()), ('cm', final_model_type())])
+    final_model.set_params(**final_model_params)
+    final_model.fit(x_train_gs, y_train_gs)
+
+    # Do the prediction
+    y_predict = final_model.predict(x_test_fsel)
+    unique_elements, counts_elements = np.unique(y_predict, return_counts=True)
+    print("test set labels and their corresponding counts")
+    print(np.asarray((unique_elements, counts_elements)))
+
     # Prepare results dataframe
-    # results = np.zeros((x_test_fsel.shape[0], 2))
-    # results[:, 0] = list(range(x_test_fsel.shape[0]))
-    # results[:, 1] = y_predict
+    results = np.zeros((x_test_fsel.shape[0], 2))
+    results[:, 0] = list(range(x_test_fsel.shape[0]))
+    results[:, 1] = y_predict
 
     # Save the output weights
-    # if not ospath.exists(output_pathname):
-    #     makedirs(output_pathname)
-    # np.savetxt(output_filepath, results, fmt=["%1.1f", "%1.1f"], newline="\n", delimiter=",", header="id,y",
-    #            comments="")
+    if not ospath.exists(output_pathname):
+        makedirs(output_pathname)
+    np.savetxt(output_filepath, results, fmt=["%1.1f", "%1.1f"], newline="\n", delimiter=",", header="id,y",
+               comments="")
 
 
 if __name__ == "__main__":
