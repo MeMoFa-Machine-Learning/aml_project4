@@ -119,6 +119,14 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     return np.array(manual_features_array)
 
 
+def down_sample_all_channels(eeg1, eeg2, emg, y_train):
+    rus = RandomUnderSampler(sampling_strategy="auto", random_state=42)
+    eeg1, y_train = rus.fit_resample(eeg1, y_train)
+    eeg2 = eeg2[rus.sample_indices_]
+    emg = emg[rus.sample_indices_]
+    return eeg1, eeg2, emg, y_train
+
+
 def train_test_split_by_individual(x, y, debug=False):
     if debug:
         hold_out_start_i = int(x.shape[0] * 2 / 3)
@@ -155,6 +163,9 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
 
     emg_mean = np.mean(train_data_emg)
     train_data_emg -= emg_mean
+
+    # Perform undersampling
+    train_data_eeg1, train_data_eeg2, train_data_emg, y_train_ds = down_sample_all_channels(train_data_eeg1, train_data_eeg2, train_data_emg, y_train_orig)
 
     # Pre-processing step: Butterworth filtering
     logging.info("Butterworth filtering...")
@@ -249,12 +260,8 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
         }
     ]
 
-    # Perform undersampling
-    rus = RandomUnderSampler(sampling_strategy="auto", random_state=42)
-    x_train_res, y_train_res = rus.fit_resample(x_train_fsel, y_train_orig)
-
     # Perform cross-validation
-    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_individual(x_train_res, y_train_res, debug=debug)
+    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_individual(x_train_fsel, y_train_ds, debug=debug)
 
     best_models = []
     for model in models:
