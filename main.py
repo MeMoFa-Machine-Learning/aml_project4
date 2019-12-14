@@ -12,7 +12,7 @@ from sklearn.neighbors import KNeighborsClassifier as KNC
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import f1_score
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from scipy.signal import savgol_filter, butter, lfilter
@@ -262,13 +262,13 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
         kfold = StratifiedKFold(n_splits=15, shuffle=True, random_state=6)
 
         # C-support vector classification
-        grid_search = GridSearchCV(pl, model['parameters'], scoring="f1_micro", n_jobs=-1, cv=kfold, verbose=1)
+        grid_search = GridSearchCV(pl, model['parameters'], scoring="balanced_accuracy", n_jobs=-1, cv=kfold, verbose=1)
         grid_result = grid_search.fit(x_train_gs, y_train_gs)
         # Calculate statistics and calculate on hold-out
         logging.info(
             "Best for model %s: %f using %s" % (str(model['model']), grid_result.best_score_, grid_result.best_params_))
         y_ho_pred = grid_search.predict(x_ho)
-        hold_out_score = f1_score(y_ho_pred, y_ho, average='micro')
+        hold_out_score = balanced_accuracy_score(y_ho_pred, y_ho)
         best_models.append((hold_out_score, grid_result.best_params_, model['model']))
         logging.info("Best score on hold-out: {}".format(hold_out_score))
 
