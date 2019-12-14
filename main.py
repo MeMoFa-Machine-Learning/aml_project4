@@ -104,16 +104,15 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=show_graphs))
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=show_graphs))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
-        feature_extracted_samples = []
 
-        # EEG features
-        feature_extracted_samples.extend(calculate_mean_based_stats(eeg1_params.filtered))
-        feature_extracted_samples.extend(calculate_mean_based_stats(eeg2_params.filtered))
-        feature_extracted_samples.extend(max_min_difference(eeg1_params.filtered))
-        feature_extracted_samples.extend(max_min_difference(eeg2_params.filtered))
-
-        # EMG params
-        feature_extracted_samples.extend(max_min_difference(emg1))
+        # Adding features
+        feature_extracted_samples = [
+            *calculate_mean_based_stats(eeg1_params.filtered),
+            *calculate_mean_based_stats(eeg2_params.filtered),
+            max_min_difference(eeg1_params.filtered),
+            max_min_difference(eeg2_params.filtered),
+            max_min_difference(emg1)
+        ]
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
@@ -203,6 +202,16 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     test_data_eeg2 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg2.csv"), debug=debug)
     test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
     logging.info("Finished reading in data.")
+
+    # Pre-processing step: mean subtraction
+    eeg1_mean = np.mean(test_data_eeg1)
+    test_data_eeg1 -= eeg1_mean
+
+    eeg2_mean = np.mean(test_data_eeg2)
+    test_data_eeg2 -= eeg2_mean
+
+    emg_mean = np.mean(test_data_emg)
+    test_data_emg -= emg_mean
 
     # Pre-processing step: Butterworth filtering
     test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))

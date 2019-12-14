@@ -30,4 +30,4 @@ def calculate_full_statistics(list_values):
 
 
 def max_min_difference(signal):
-    return [np.max(signal) - np.min(signal)]
+    return np.max(signal) - np.min(signal)
