@@ -19,9 +19,10 @@ from scipy.signal import savgol_filter, butter, lfilter
 from tqdm import tqdm
 from statistics import median as pymedian
 from scipy.stats import entropy as sci_entropy
-import pywt
 from collections import Counter
 from helpers.helpers import EegStore, EmgStore
+from helpers.feature_extraction import *
+from imblearn.under_sampling import RandomUnderSampler
 
 import logging
 
@@ -29,7 +30,7 @@ logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(message)s')
 
 # Debug parameters
-first_n_lines_input = 50
+first_n_lines_input = 500
 
 
 def perform_data_scaling(x_train, x_test):
@@ -92,22 +93,35 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
     return y
 
 
-def extract_manual_features(eeg1, eeg2, emg1):
+def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = []
     for i in tqdm(range(0, len(eeg1))):
-        eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=False))
-        eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=False))
-        # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
+        if show_graphs:
+            eeg_comb = np.concatenate((eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)),
+                                       eeg2[i].transpose().reshape((eeg2[i].shape[0], 1))), axis=1)
+            eeg_params = EegStore(*eeg.eeg(signal=eeg_comb, sampling_rate=128, show=show_graphs))
 
-        feature_extracted_samples = [eeg1_params.gamma[0], eeg2_params.gamma[0], emg1[i][0]]
+        eeg1_params = EegStore(*eeg.eeg(signal=eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)), sampling_rate=128, show=show_graphs))
+        eeg2_params = EegStore(*eeg.eeg(signal=eeg2[i].transpose().reshape((eeg2[i].shape[0], 1)), sampling_rate=128, show=show_graphs))
+        # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
+        feature_extracted_samples = []
+
+        # EEG features
+        feature_extracted_samples.extend(calculate_mean_based_stats(eeg1_params.filtered))
+        feature_extracted_samples.extend(calculate_mean_based_stats(eeg2_params.filtered))
+        feature_extracted_samples.extend(max_min_difference(eeg1_params.filtered))
+        feature_extracted_samples.extend(max_min_difference(eeg2_params.filtered))
+
+        # EMG params
+        feature_extracted_samples.extend(max_min_difference(emg1))
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
 
 
-def train_test_split_by_indivdiual(x, y, debug=False):
+def train_test_split_by_individual(x, y, debug=False):
     if debug:
-        hold_out_start_i = int(first_n_lines_input * 2 / 3)
+        hold_out_start_i = int(x.shape[0] * 2 / 3)
     else:
         hold_out_start_i = 43200
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
@@ -115,7 +129,7 @@ def train_test_split_by_indivdiual(x, y, debug=False):
     return x_gs, y_gs, x_ho, y_ho
 
 
-def main(debug=False, outfile="out.csv"):
+def main(debug=False, show_graphs=False, outfile="out.csv"):
     output_pathname = "output"
     output_filepath = ospath.join(output_pathname, outfile)
     training_data_dir = ospath.join("data", "training")
@@ -143,6 +157,7 @@ def main(debug=False, outfile="out.csv"):
     train_data_emg -= emg_mean
 
     # Pre-processing step: Butterworth filtering
+    logging.info("Butterworth filtering...")
     train_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
     train_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
     train_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
@@ -157,10 +172,11 @@ def main(debug=False, outfile="out.csv"):
     train_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
     train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_emg))
     # train_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_emg)) TODO: Fix bug
+    logging.info("Finished Butterworth filtering")
 
     # Extract features of training set
     logging.info("Extracting features...")
-    x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg)
+    x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
     # Load raw ECG testing data
@@ -188,7 +204,7 @@ def main(debug=False, outfile="out.csv"):
 
     # Extract features of testing set
     logging.info("Extracting features...")
-    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg)
+    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
     # Pre-processing step for meta-feature calculation: StandardScaler
@@ -206,13 +222,13 @@ def main(debug=False, outfile="out.csv"):
     knn_leaf_size = [30] if debug else [20, 30, 40]
 
     k_best_features = [x_train_fsel.shape[1]] if debug else list(
-        np.linspace(start=5, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
+        np.linspace(start=2, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
 
     models = [
         {
             'model': RandomForestClassifier,
             'parameters': {
-                'fs__k': k_best_features,
+                'fs__k': [x_train_fsel.shape[1]],
                 'cm__criterion': ['entropy', 'gini'],
                 'cm__max_depth': max_depth,
                 'cm__min_samples_split': min_samples_split,
@@ -233,8 +249,12 @@ def main(debug=False, outfile="out.csv"):
         }
     ]
 
+    # Perform undersampling
+    rus = RandomUnderSampler(sampling_strategy="auto", random_state=42)
+    x_train_res, y_train_res = rus.fit_resample(x_train_fsel, y_train_orig)
+
     # Perform cross-validation
-    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_indivdiual(x_train_fsel, y_train_orig, debug=debug)
+    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_individual(x_train_res, y_train_res, debug=debug)
 
     best_models = []
     for model in models:
@@ -285,7 +305,8 @@ def main(debug=False, outfile="out.csv"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process sleep data")
     parser.add_argument("--debug", action='store_true')
+    parser.add_argument("--show_graphs", action='store_true')
     parser.add_argument("--outfile", required=False, default="out.csv")
     args = parser.parse_args()
 
-    main(debug=args.debug, outfile=args.outfile)
+    main(debug=args.debug, show_graphs=args.show_graphs, outfile=args.outfile)
