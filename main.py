@@ -145,6 +145,44 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     training_data_dir = ospath.join("data", "training")
     testing_data_dir = ospath.join("data", "testing")
 
+    # Load raw ECG testing data
+    logging.info("Reading in testing data...")
+    test_data_eeg1 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg1.csv"), debug=debug)
+    test_data_eeg2 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg2.csv"), debug=debug)
+    test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
+    logging.info("Finished reading in data.")
+
+    # Pre-processing step: mean subtraction
+    eeg1_mean = np.mean(test_data_eeg1)
+    test_data_eeg1 -= eeg1_mean
+
+    eeg2_mean = np.mean(test_data_eeg2)
+    test_data_eeg2 -= eeg2_mean
+
+    emg_mean = np.mean(test_data_emg)
+    test_data_emg -= emg_mean
+
+    # Pre-processing step: Butterworth filtering
+    test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
+    test_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
+    test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
+    # test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1)) TODO: Fix bug
+
+    test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
+    test_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
+    test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
+    # test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2)) TODO: Fix bug
+
+    test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
+    test_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
+    test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
+    # test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg)) TODO: Fix bug
+
+    # Extract features of testing set
+    logging.info("Extracting features...")
+    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg, show_graphs=show_graphs)
+    logging.info("Finished extracting features")
+
     # Load training data
     logging.info("Reading in training data...")
     train_data_eeg1 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug)
@@ -194,44 +232,6 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     # Extract features of training set
     logging.info("Extracting features...")
     x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
-    logging.info("Finished extracting features")
-
-    # Load raw ECG testing data
-    logging.info("Reading in testing data...")
-    test_data_eeg1 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg1.csv"), debug=debug)
-    test_data_eeg2 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg2.csv"), debug=debug)
-    test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
-    logging.info("Finished reading in data.")
-
-    # Pre-processing step: mean subtraction
-    eeg1_mean = np.mean(test_data_eeg1)
-    test_data_eeg1 -= eeg1_mean
-
-    eeg2_mean = np.mean(test_data_eeg2)
-    test_data_eeg2 -= eeg2_mean
-
-    emg_mean = np.mean(test_data_emg)
-    test_data_emg -= emg_mean
-
-    # Pre-processing step: Butterworth filtering
-    test_data_eeg1 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
-    test_data_eeg1 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
-    test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
-    # test_smoothed_eeg1 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1)) TODO: Fix bug
-
-    test_data_eeg2 = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
-    test_data_eeg2 = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
-    test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
-    # test_smoothed_eeg2 = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2)) TODO: Fix bug
-
-    test_data_emg = list(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
-    test_data_emg = list(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
-    test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
-    # test_smoothed_emg = list(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_emg)) TODO: Fix bug
-
-    # Extract features of testing set
-    logging.info("Extracting features...")
-    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
     # Pre-processing step for meta-feature calculation: StandardScaler
