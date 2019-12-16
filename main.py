@@ -321,7 +321,7 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     # Save the output weights
     if not ospath.exists(output_pathname):
         makedirs(output_pathname)
-    np.savetxt(output_filepath, results, fmt=["%1.1f", "%1.1f"], newline="\n", delimiter=",", header="id,y",
+    np.savetxt(output_filepath, results, fmt=["%.0f", "%.0f"], newline="\n", delimiter=",", header="Id,y",
                comments="")
 
 
