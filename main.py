@@ -19,7 +19,7 @@ from scipy.signal import savgol_filter, butter, lfilter
 from tqdm import tqdm
 from statistics import median as pymedian
 from scipy.stats import entropy as sci_entropy
-from collections import Counter
+from collections import Counter, deque
 from helpers.helpers import EegStore, EmgStore
 from helpers.feature_extraction import *
 from imblearn.under_sampling import RandomUnderSampler
@@ -94,7 +94,7 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
-    manual_features_array = []
+    manual_features_array = deque()
     for i in tqdm(range(0, len(eeg1))):
         if show_graphs:
             eeg_comb = np.concatenate((eeg1[i].transpose().reshape((eeg1[i].shape[0], 1)),
@@ -106,13 +106,13 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
         # Adding features
-        feature_extracted_samples = [
+        feature_extracted_samples = (
             *calculate_mean_based_stats(eeg1_params.filtered),
             *calculate_mean_based_stats(eeg2_params.filtered),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
             max_min_difference(emg1)
-        ]
+        )
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
