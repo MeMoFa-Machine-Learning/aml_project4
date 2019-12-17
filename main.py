@@ -27,6 +27,9 @@ import logging
 logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(message)s')
 
+# General params
+individual_3_cutoff_i_orig = 43200
+
 # Debug parameters
 first_n_lines_input = 2000
 
@@ -132,20 +135,20 @@ def down_sample_all_channels(eeg1, eeg2, emg, y_train):
     eeg2 = eeg2[sample_indices_sorted]
     emg = emg[sample_indices_sorted]
     y_train = y_train[sample_indices_sorted]
-    return eeg1, eeg2, emg, y_train, np.argmax(sample_indices_sorted >= 43200)
+    return eeg1, eeg2, emg, y_train, np.argmax(sample_indices_sorted >= individual_3_cutoff_i_orig)
 
 
-def train_test_split_by_individual(x, y, indivdual_3_cutoff_i, debug=False):
+def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     if debug:
         hold_out_start_i = int(x.shape[0] * 2 / 3)
     else:
-        hold_out_start_i = indivdual_3_cutoff_i
+        hold_out_start_i = person_3_cutoff_i
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
     x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
     return x_gs, y_gs, x_ho, y_ho
 
 
-def main(debug=False, show_graphs=False, outfile="out.csv"):
+def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     output_pathname = "output"
     output_filepath = ospath.join(output_pathname, outfile)
     training_data_dir = ospath.join("data", "training")
@@ -173,11 +176,15 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     train_data_emg -= emg_mean
 
     # Perform undersampling
-    (train_data_eeg1,
-     train_data_eeg2,
-     train_data_emg,
-     y_train_ds,
-     indivdual_3_cutoff_i) = down_sample_all_channels(train_data_eeg1, train_data_eeg2, train_data_emg, y_train_orig)
+    if downsample:
+        (train_data_eeg1,
+         train_data_eeg2,
+         train_data_emg,
+         y_train_ds,
+         individual_3_cutoff_i) = down_sample_all_channels(train_data_eeg1, train_data_eeg2, train_data_emg, y_train_orig)
+    else:
+        individual_3_cutoff_i = individual_3_cutoff_i_orig
+        y_train_ds = y_train_orig
 
     # Pre-processing step: Butterworth filtering
     logging.info("Butterworth filtering...")
@@ -299,7 +306,7 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     ]
 
     # Perform cross-validation
-    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_individual(x_train_fsel, y_train_ds, indivdual_3_cutoff_i, debug=debug)
+    x_train_gs, y_train_gs, x_ho, y_ho = train_test_split_by_individual(x_train_fsel, y_train_ds, individual_3_cutoff_i, debug=debug)
 
     best_models = []
     for model in models:
@@ -350,8 +357,9 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process sleep data")
     parser.add_argument("--debug", action='store_true')
+    parser.add_argument("--downsample", action='store_true')
     parser.add_argument("--show_graphs", action='store_true')
     parser.add_argument("--outfile", required=False, default="out.csv")
     args = parser.parse_args()
 
-    main(debug=args.debug, show_graphs=args.show_graphs, outfile=args.outfile)
+    main(debug=args.debug, show_graphs=args.show_graphs, downsample=args.downsample, outfile=args.outfile)
