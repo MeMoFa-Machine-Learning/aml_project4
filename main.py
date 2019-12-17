@@ -9,7 +9,7 @@ import biosppy.signals.eeg as eeg
 import biosppy.signals.emg as emg
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import balanced_accuracy_score
@@ -103,8 +103,8 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
             eeg_params = EegStore(*eeg.eeg(signal=eeg_comb, sampling_rate=128, show=show_graphs))
 
-        eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=show_graphs))
-        eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=show_graphs))
+        eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=False))
+        eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
         # Adding features
@@ -250,6 +250,8 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     knn_p = [2] if debug else [1, 2, 3]
     knn_leaf_size = [30] if debug else [20, 30, 40]
 
+    bagging_n_estimators = [100] if debug else [10, 100, 200, 350, 500]
+
     k_best_features = [x_train_fsel.shape[1]] if debug else list(
         np.linspace(start=2, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
 
@@ -274,6 +276,14 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
                 'cm__algorithm': knn_algorithm,
                 'cm__leaf_size': knn_leaf_size,
                 'cm__p': knn_p
+            }
+        },
+        {
+            'model': BaggingClassifier,
+            'parameters': {
+                'fs__k': k_best_features,
+                'cm__n_estimators': bagging_n_estimators,
+                'cm__oob_score': [True],
             }
         }
     ]
