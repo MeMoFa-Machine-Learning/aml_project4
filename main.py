@@ -7,6 +7,7 @@ from itertools import tee
 from csv import reader
 import biosppy.signals.eeg as eeg
 import biosppy.signals.emg as emg
+from PyEMD import CEEMDAN
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
 from sklearn.ensemble import RandomForestClassifier
@@ -30,7 +31,7 @@ logging.getLogger().setLevel(logging.INFO)
 logging.basicConfig(format='%(asctime)s - %(message)s')
 
 # Debug parameters
-first_n_lines_input = 500
+first_n_lines_input = 2000
 
 
 def perform_data_scaling(x_train, x_test):
@@ -103,17 +104,23 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
             eeg_params = EegStore(*eeg.eeg(signal=eeg_comb, sampling_rate=128, show=show_graphs))
 
-        eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=show_graphs))
-        eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=show_graphs))
+        eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=False))
+        eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
         # Adding features
         feature_extracted_samples = (
             *calculate_mean_based_stats(eeg1_params.filtered),
             *calculate_mean_based_stats(eeg2_params.filtered),
+            *calculate_mean_based_stats(emg_epoch),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
-            max_min_difference(emg_epoch)
+            max_min_difference(eeg1_params.theta),
+            max_min_difference(eeg2_params.theta),
+            max_min_difference(emg_epoch),
+            *calculate_percentiles(emg_epoch),
+            *calculate_percentiles(eeg1_params.theta),
+            *calculate_percentiles(eeg2_params.theta)
         )
 
         manual_features_array.append(feature_extracted_samples)
@@ -177,16 +184,19 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
 
     # Pre-processing step: Butterworth filtering
     logging.info("Butterworth filtering...")
+    # train_smoothed_eeg1 = train_data_eeg1
     train_data_eeg1 = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg1))
     train_data_eeg1 = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg1))
     train_smoothed_eeg1 = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg1))
     # train_smoothed_eeg1 = deque(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg1)) TODO: Fix bug
 
+    # train_smoothed_eeg2 = deque(train_data_eeg2)
     train_data_eeg2 = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_eeg2))
     train_data_eeg2 = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_eeg2))
     train_smoothed_eeg2 = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_eeg2))
     # train_smoothed_eeg2 = deque(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), train_data_eeg2)) TODO: Fix bug
 
+    # train_smoothed_emg = deque(train_data_emg)
     train_data_emg = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), train_data_emg))
     train_data_emg = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), train_data_emg))
     train_smoothed_emg = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), train_data_emg))
@@ -216,16 +226,19 @@ def main(debug=False, show_graphs=False, outfile="out.csv"):
     test_data_emg -= emg_mean
 
     # Pre-processing step: Butterworth filtering
+    # test_smoothed_eeg1 = test_data_eeg1
     test_data_eeg1 = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg1))
     test_data_eeg1 = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg1))
     test_smoothed_eeg1 = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg1))
     # test_smoothed_eeg1 = deque(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg1)) TODO: Fix bug
 
+    # test_smoothed_eeg2 = deque(test_data_eeg2)
     test_data_eeg2 = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_eeg2))
     test_data_eeg2 = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_eeg2))
     test_smoothed_eeg2 = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_eeg2))
     # test_smoothed_eeg2 = deque(map(lambda x: butter_bandstop_filter(x, 97, 103, 128, 3), test_data_eeg2)) TODO: Fix bug
 
+    # test_smoothed_emg = deque(test_data_emg)
     test_data_emg = deque(map(lambda x: butter_lowpass_filter(x, 50, 128, 3), test_data_emg))
     test_data_emg = deque(map(lambda x: butter_highpass_filter(x, .5, 128, 3), test_data_emg))
     test_smoothed_emg = deque(map(lambda x: butter_bandstop_filter(x, 47, 53, 128, 3), test_data_emg))
