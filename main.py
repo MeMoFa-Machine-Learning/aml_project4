@@ -7,7 +7,6 @@ from itertools import tee
 from csv import reader
 import biosppy.signals.eeg as eeg
 import biosppy.signals.emg as emg
-from PyEMD import CEEMDAN
 from sklearn.feature_selection import SelectKBest
 from sklearn.neighbors import KNeighborsClassifier as KNC
 from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
@@ -18,8 +17,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from scipy.signal import savgol_filter, butter, lfilter
 from tqdm import tqdm
-from statistics import median as pymedian
-from scipy.stats import entropy as sci_entropy
 from collections import Counter, deque
 from helpers.helpers import EegStore, EmgStore
 from helpers.feature_extraction import *
