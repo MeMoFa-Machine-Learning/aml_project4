@@ -35,5 +35,12 @@ def max_min_difference(signal):
 
 
 def calculate_skew_kurtosis_difference(signal1, signal2):
-    return (skew(signal1, bias=False) - skew(signal2, bias=False),
-            kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False))
+    skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
+    kurtosis_difference = kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False)
+    return [skew_difference[0], kurtosis_difference[0]]
+
+
+def calculate_skew_kurtosis_difference_emg(signal1, signal2):
+    skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
+    kurtosis_difference = kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False)
+    return [skew_difference, kurtosis_difference]

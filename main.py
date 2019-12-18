@@ -113,9 +113,12 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
+
+    # Setup initial prev variables
     eeg1_epoch_prev = EegStore(*eeg.eeg(signal=eeg1[-1].reshape((eeg1[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
     eeg2_epoch_prev = EegStore(*eeg.eeg(signal=eeg2[-1].reshape((eeg2[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
     emg_epoch_prev = emg1[-1]
+
     for eeg1_epoch in tqdm(eeg1):
         eeg2_epoch = eeg2.popleft()
         emg_epoch = emg1.popleft()
@@ -143,7 +146,7 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *calculate_percentiles(eeg2_params.theta),
             *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
             *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
-            *calculate_skew_kurtosis_difference(emg_epoch, emg_epoch_prev),
+            *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
         )
 
         eeg1_epoch_prev = eeg1_params.filtered
