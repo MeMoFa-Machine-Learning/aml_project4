@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import kurtosis, skew
 
 
 def calculate_percentiles(values):
@@ -31,3 +32,8 @@ def calculate_full_statistics(list_values):
 
 def max_min_difference(signal):
     return np.max(signal) - np.min(signal)
+
+
+def calculate_skew_kurtosis_difference(signal1, signal2):
+    return (skew(signal1, bias=False) - skew(signal2, bias=False),
+            kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False))

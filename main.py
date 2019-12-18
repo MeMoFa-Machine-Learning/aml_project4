@@ -32,7 +32,7 @@ individual_3_cutoff_i_orig = 43200
 max_individual_amount = 21600
 
 # Debug parameters
-first_n_lines_input = 2000
+first_n_lines_input = 500
 first_n_lines_input = int(first_n_lines_input / 3) * 3
 
 
@@ -113,6 +113,9 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
+    eeg1_epoch_prev = EegStore(*eeg.eeg(signal=eeg1[-1].reshape((eeg1[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    eeg2_epoch_prev = EegStore(*eeg.eeg(signal=eeg2[-1].reshape((eeg2[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    emg_epoch_prev = emg1[-1]
     for eeg1_epoch in tqdm(eeg1):
         eeg2_epoch = eeg2.popleft()
         emg_epoch = emg1.popleft()
@@ -137,8 +140,15 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             max_min_difference(emg_epoch),
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
-            *calculate_percentiles(eeg2_params.theta)
+            *calculate_percentiles(eeg2_params.theta),
+            *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
+            *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
+            *calculate_skew_kurtosis_difference(emg_epoch, emg_epoch_prev),
         )
+
+        eeg1_epoch_prev = eeg1_params.filtered
+        eeg2_epoch_prev = eeg2_params.filtered
+        emg_epoch_prev = emg_epoch_prev
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
