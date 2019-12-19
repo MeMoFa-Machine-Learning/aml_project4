@@ -29,9 +29,11 @@ logging.basicConfig(format='%(asctime)s - %(message)s')
 
 # General params
 individual_3_cutoff_i_orig = 43200
+max_individual_amount = 21600
 
 # Debug parameters
-first_n_lines_input = 2000
+first_n_lines_input = 500
+first_n_lines_input = int(first_n_lines_input / 3) * 3
 
 
 def perform_data_scaling(x_train, x_test):
@@ -41,16 +43,31 @@ def perform_data_scaling(x_train, x_test):
     return x_train_whitened, x_test_whitened
 
 
-def read_in_irregular_csv(path_to_file, skip_n_lines=1, debug=False):
+def read_in_irregular_csv(path_to_file, is_training, skip_n_lines=1, debug=False):
     file_array = deque()
+
+    # Params only used in debug mode
+    each_individual_amount = int(first_n_lines_input / 3)
+    current_offset = 0
+
     with open(path_to_file, 'r') as csv_file:
         brain_waves_reader = reader(csv_file, delimiter=',', quotechar='|')
         for row_to_skip in range(skip_n_lines):
             next(brain_waves_reader)
         for i, row in enumerate(tqdm(brain_waves_reader)):
-            if debug and i == first_n_lines_input:
+            if debug and is_training:
+                if i == individual_3_cutoff_i_orig + each_individual_amount:
+                    break
+                elif i < current_offset:
+                    pass
+                elif i >= current_offset + each_individual_amount:
+                    current_offset += max_individual_amount
+                else:
+                    file_array.append(np.array(row[1:], dtype=np.float32))
+            elif debug and not is_training and i == first_n_lines_input:
                 break
-            file_array.append(np.array(row[1:], dtype=np.float32))
+            else:
+                file_array.append(np.array(row[1:], dtype=np.float32))
     return file_array
 
 
@@ -96,6 +113,12 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
+
+    # Setup initial prev variables
+    eeg1_epoch_prev = EegStore(*eeg.eeg(signal=eeg1[-1].reshape((eeg1[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    eeg2_epoch_prev = EegStore(*eeg.eeg(signal=eeg2[-1].reshape((eeg2[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    emg_epoch_prev = emg1[-1]
+
     for eeg1_epoch in tqdm(eeg1):
         eeg2_epoch = eeg2.popleft()
         emg_epoch = emg1.popleft()
@@ -141,7 +164,15 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[2],
             get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[2],
             get_dominant_peaks_position(emg_freq_peak_positions,emg_freq_dict)[2]
+            # some weird stuff merel did:
+            *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
+            *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
+            *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
         )
+
+        eeg1_epoch_prev = eeg1_params.filtered
+        eeg2_epoch_prev = eeg2_params.filtered
+        emg_epoch_prev = emg_epoch_prev
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
@@ -186,9 +217,9 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
 
     # Load training data
     logging.info("Reading in training data...")
-    train_data_eeg1 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), debug=debug)
-    train_data_eeg2 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), debug=debug)
-    train_data_emg = read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), debug=debug)
+    train_data_eeg1 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg1.csv"), True, debug=debug)
+    train_data_eeg2 = read_in_irregular_csv(ospath.join(training_data_dir, "train_eeg2.csv"), True, debug=debug)
+    train_data_emg = read_in_irregular_csv(ospath.join(training_data_dir, "train_emg.csv"), True, debug=debug)
     train_data_y = pd.read_csv(ospath.join(training_data_dir, "train_labels.csv"), delimiter=",")["y"]
     if debug:
         train_data_y = train_data_y.head(first_n_lines_input)
@@ -245,9 +276,9 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
 
     # Load raw ECG testing data
     logging.info("Reading in testing data...")
-    test_data_eeg1 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg1.csv"), debug=debug)
-    test_data_eeg2 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg2.csv"), debug=debug)
-    test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), debug=debug)
+    test_data_eeg1 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg1.csv"), False, debug=debug)
+    test_data_eeg2 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg2.csv"), False, debug=debug)
+    test_data_emg = read_in_irregular_csv(ospath.join(testing_data_dir, "test_emg.csv"), False, debug=debug)
     logging.info("Finished reading in data.")
 
     # Pre-processing step: mean subtraction

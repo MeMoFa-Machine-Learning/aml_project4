@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+from scipy.stats import kurtosis, skew
 
 
 def calculate_percentiles(values):
@@ -63,3 +64,13 @@ def get_dominant_peaks_position(peak_positions, peak_dict):
     return sorted_desc[0]
 
 
+def calculate_skew_kurtosis_difference(signal1, signal2):
+    skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
+    kurtosis_difference = kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False)
+    return [skew_difference[0], kurtosis_difference[0]]
+
+
+def calculate_skew_kurtosis_difference_emg(signal1, signal2):
+    skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
+    kurtosis_difference = kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False)
+    return [skew_difference, kurtosis_difference]
