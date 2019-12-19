@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 
 
 def calculate_percentiles(values):
@@ -31,3 +32,34 @@ def calculate_full_statistics(list_values):
 
 def max_min_difference(signal):
     return np.max(signal) - np.min(signal)
+
+
+#######################################
+####### Frequency Features ############
+#######################################
+
+def extract_peaks(signal):
+    """returns peaks and properties
+    Args:
+        signal (1D-array): frequency transformed signal
+    Returns:
+        1D-array, dict: indices of peaks, {‘peak_heights’, ‘left_thresholds’, ‘right_thresholds’, ‘prominences’, ‘right_bases’, ‘left_bases’, ‘width_heights’, ‘left_ips’, ‘right_ips’, ‘plateau_sizes’, left_edges’, ‘right_edges’}
+    """
+    peaks = sp.signal.find_peaks(signal, height=0)
+    return peaks
+
+def get_dominant_peaks_position(peak_positions, peak_dict):
+    """get the position of peaks (ordered by height) from the return values of extract_peaks()
+    Args:
+        peak_positions (int): indices of the peak positions in the signal
+        peak_dict (dict): dict with peak information from extract_peaks()
+    Returns:
+        1D-array: List with position of peaks ordered by descending height
+    """
+    peak_array = np.zeros((2, len(peak_positions))) # array with peak positions and respective heights
+    peak_array[0] = peak_positions
+    peak_array[1] = peak_dict["peak_heights"]
+    sorted_desc = peak_array[:, peak_array[1].argsort()]
+    return sorted_desc[0]
+
+

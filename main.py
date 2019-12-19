@@ -99,6 +99,11 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     for eeg1_epoch in tqdm(eeg1):
         eeg2_epoch = eeg2.popleft()
         emg_epoch = emg1.popleft()
+        # fourier-transform signals:
+        eeg1_epoch_freq = fourier_transform(eeg1_epoch)
+        eeg2_epoch_freq = fourier_transform(eeg2_epoch)
+        emg_epoch_freq = fourier_transform(emg_epoch)
+
         if show_graphs:
             eeg_comb = np.concatenate((eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)),
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
@@ -107,6 +112,11 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=False))
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
+
+        # extract peak info from frequency signals
+        eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
+        eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
+        emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
 
         # Adding features
         feature_extracted_samples = (
@@ -120,7 +130,17 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             max_min_difference(emg_epoch),
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
-            *calculate_percentiles(eeg2_params.theta)
+            *calculate_percentiles(eeg2_params.theta),
+            # frequency of the 3 most dominant peaks:
+            get_dominant_peaks_position(eeg1_freq_peak_positions,eeg1_freq_dict)[0],
+            get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[0],
+            get_dominant_peaks_position(emg_freq_peak_positions,emg_freq_dict)[0],
+            get_dominant_peaks_position(eeg1_freq_peak_positions,eeg1_freq_dict)[1],
+            get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[1],
+            get_dominant_peaks_position(emg_freq_peak_positions,emg_freq_dict)[1],
+            get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[2],
+            get_dominant_peaks_position(eeg2_freq_peak_positions,eeg2_freq_dict)[2],
+            get_dominant_peaks_position(emg_freq_peak_positions,emg_freq_dict)[2]
         )
 
         manual_features_array.append(feature_extracted_samples)
@@ -137,7 +157,6 @@ def down_sample_all_channels(eeg1, eeg2, emg, y_train):
     y_train = y_train[sample_indices_sorted]
     return eeg1, eeg2, emg, y_train, np.argmax(sample_indices_sorted >= individual_3_cutoff_i_orig)
 
-
 def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     if debug:
         hold_out_start_i = int(x.shape[0] * 2 / 3)
@@ -146,6 +165,17 @@ def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
     x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
     return x_gs, y_gs, x_ho, y_ho
+
+def fourier_transform(data):
+    """transforms the data row-by-row into frequency space
+    Args:
+        data (2D numpy array): time-domain data of EEG, ECG and EMG signals
+    Returns:
+        2D numpy array: fourier-transformed data
+    """
+    ft_data = np.fft.fft(data)
+    return ft_data 
+
 
 
 def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
@@ -211,6 +241,7 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     logging.info("Extracting features...")
     x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
+
 
     # Load raw ECG testing data
     logging.info("Reading in testing data...")
