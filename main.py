@@ -122,6 +122,11 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     for eeg1_epoch in tqdm(eeg1):
         eeg2_epoch = eeg2.popleft()
         emg_epoch = emg1.popleft()
+        # fourier-transform signals:
+        eeg1_epoch_freq = fourier_transform(eeg1_epoch)
+        eeg2_epoch_freq = fourier_transform(eeg2_epoch)
+        emg_epoch_freq = fourier_transform(emg_epoch)
+
         if show_graphs:
             eeg_comb = np.concatenate((eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)),
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
@@ -130,6 +135,27 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg1_params = EegStore(*eeg.eeg(signal=eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)), sampling_rate=128, show=False))
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
+
+        # extract peak info from frequency signals
+        eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
+        eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
+        emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
+        # peak positions:
+        eeg1_p_positions, eeg1_p_heights = get_dominant_peaks_position_and_heights(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_p_positions, eeg2_p_heights = get_dominant_peaks_position_and_heights(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_p_positions, emg_p_heights = get_dominant_peaks_position_and_heights(emg_freq_peak_positions,emg_freq_dict)
+        # plateau positions:
+        eeg1_plat_positions, eeg1_plat_sizes = get_plateau_positions_and_sizes(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_plat_positions, eeg2_plat_sizes = get_plateau_positions_and_sizes(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_plat_positions, emg_plat_sizes = get_plateau_positions_and_sizes(emg_freq_peak_positions,emg_freq_dict)
+        # prominences:
+        eeg1_prom_positions, eeg1_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_prom_positions, eeg2_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_prom_positions, emg_prom_sizes = get_prominent_peaks_positions_and_prominence(emg_freq_peak_positions,emg_freq_dict)
+        # widths:
+        eeg1_prom_positions = get_widths_of_heighest_peaks(eeg1_freq_peak_positions,eeg1_freq_dict,eeg1_epoch_freq)
+        eeg2_prom_positions = get_widths_of_heighest_peaks(eeg2_freq_peak_positions,eeg2_freq_dict,eeg2_epoch_freq)
+        emg_prom_positions = get_widths_of_heighest_peaks(emg_freq_peak_positions,emg_freq_dict,emg_epoch_freq)
 
         # Adding features
         feature_extracted_samples = (
@@ -144,6 +170,38 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
             *calculate_percentiles(eeg2_params.theta),
+            # frequency features:
+            eeg1_p_positions[0], eeg1_p_heights[0],
+            eeg2_p_positions[0], eeg2_p_heights[0],
+            emg_p_positions[0], emg_p_heights[0],
+            eeg1_p_positions[1], eeg1_p_heights[1],
+            eeg2_p_positions[1], eeg2_p_heights[1],
+            emg_p_positions[1], emg_p_heights[1],
+            eeg1_p_positions[2], eeg1_p_heights[2],
+            eeg2_p_positions[2], eeg2_p_heights[2],
+            emg_p_positions[2], emg_p_heights[2],
+            eeg1_plat_positions[0], eeg1_plat_sizes[0],
+            eeg2_plat_positions[0], eeg2_plat_sizes[0],
+            emg_plat_positions[0], emg_plat_sizes[0],
+            eeg1_plat_positions[1], eeg1_plat_sizes[1],
+            eeg2_plat_positions[1], eeg2_plat_sizes[1],
+            emg_plat_positions[1], emg_plat_sizes[1],
+            eeg1_plat_positions[2], eeg1_plat_sizes[2],
+            eeg2_plat_positions[2], eeg2_plat_sizes[2],
+            emg_plat_positions[2], emg_plat_sizes[2],
+            eeg1_prom_positions[0], eeg1_prom_sizes[0],
+            eeg2_prom_positions[0], eeg2_prom_sizes[0],
+            emg_prom_positions[0], emg_prom_sizes[0],
+            eeg1_prom_positions[1], eeg1_prom_sizes[1],
+            eeg2_prom_positions[1], eeg2_prom_sizes[1],
+            emg_prom_positions[1], emg_prom_sizes[1],
+            eeg1_prom_positions[2], eeg1_prom_sizes[2],
+            eeg2_prom_positions[2], eeg2_prom_sizes[2],
+            emg_prom_positions[2], emg_prom_sizes[2],
+            eeg1_prom_positions[0],eeg1_prom_positions[1],eeg1_prom_positions[2],
+            eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
+            emg_prom_positions[0],emg_prom_positions[1],emg_prom_positions[2],
+            # some weird stuff merel did:
             *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
             *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
             *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
@@ -167,7 +225,6 @@ def down_sample_all_channels(eeg1, eeg2, emg, y_train):
     y_train = y_train[sample_indices_sorted]
     return eeg1, eeg2, emg, y_train, np.argmax(sample_indices_sorted >= individual_3_cutoff_i_orig)
 
-
 def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     if debug:
         hold_out_start_i = int(x.shape[0] * 2 / 3)
@@ -176,6 +233,17 @@ def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
     x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
     return x_gs, y_gs, x_ho, y_ho
+
+def fourier_transform(data):
+    """transforms the data row-by-row into frequency space
+    Args:
+        data (2D numpy array): time-domain data of EEG, ECG and EMG signals
+    Returns:
+        2D numpy array: fourier-transformed data
+    """
+    ft_data = np.fft.fft(data)
+    return ft_data 
+
 
 
 def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
@@ -241,6 +309,7 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     logging.info("Extracting features...")
     x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
+
 
     # Load raw ECG testing data
     logging.info("Reading in testing data...")
