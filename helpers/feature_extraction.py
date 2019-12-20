@@ -103,8 +103,9 @@ def get_widths_of_heighest_peaks(peak_positions, peak_dict, signal):
     peak_array[0] = peak_positions
     peak_array[1] = peak_dict["width_heights"]
     sorted_desc = peak_array[:, peak_array[1].argsort()]
-    peak_widths = sp.signal.peak_widths(signal, sorted_desc)
+    peak_widths = sp.signal.peak_widths(signal, sorted_desc[0].astype(int))
     return peak_widths
+
 
 def calculate_skew_kurtosis_difference(signal1, signal2):
     skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
@@ -116,3 +117,8 @@ def calculate_skew_kurtosis_difference_emg(signal1, signal2):
     skew_difference = skew(signal1, bias=False) - skew(signal2, bias=False)
     kurtosis_difference = kurtosis(signal1, bias=False) - kurtosis(signal2, bias=False)
     return [skew_difference, kurtosis_difference]
+
+
+def largest_and_smallest_values_average(signal1):
+    sorted_signal = np.sort(signal1)
+    return [np.average(sorted_signal[:3]), np.average(sorted_signal[-3:])]
