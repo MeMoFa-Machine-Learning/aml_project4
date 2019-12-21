@@ -89,8 +89,8 @@ def get_prominent_peaks_positions_and_prominence(peak_positions, peak_dict):
     peak_array[0] = peak_positions
     peak_array[1] = peak_dict["prominences"]
     sorted_desc = peak_array[:, peak_array[1].argsort()]
-    print (sorted_desc[0])
     return sorted_desc[0], sorted_desc[1]
+
 
 def get_widths_of_heighest_peaks(peak_positions, peak_dict, signal):
     """Get widhts of the highest peaks
