@@ -434,7 +434,7 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
             'parameters': {
                 'fs__k': k_best_features,
                 'cm__base_estimator': [
-                    LinearSVC(class_weight="balanced", max_iter=250)
+                    LinearSVC(class_weight="balanced", max_iter=100)
                 ],
                 'cm__n_estimators': bagging_n_estimators,
                 'cm__oob_score': [True],
