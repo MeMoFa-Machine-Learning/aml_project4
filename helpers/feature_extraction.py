@@ -119,6 +119,11 @@ def calculate_skew_kurtosis_difference_emg(signal1, signal2):
     return [skew_difference, kurtosis_difference]
 
 
-def largest_and_smallest_values_average(signal1):
+def largest_and_smallest_values_average_and_percentiles(signal1):
     sorted_signal = np.sort(signal1)
-    return [np.average(sorted_signal[:3]), np.average(sorted_signal[-3:])]
+    n5 = sorted_signal[int(len(sorted_signal) * 0.05)]
+    n25 = sorted_signal[int(len(sorted_signal) * 0.25)]
+    n50 = sorted_signal[int(len(sorted_signal) * 0.5)]
+    n75 = sorted_signal[int(len(sorted_signal) * 0.75)]
+    n95 = sorted_signal[int(len(sorted_signal) * 0.95)]
+    return [np.average(sorted_signal[:3]), np.average(sorted_signal[-3:]), n5, n25, n50, n75, n95]

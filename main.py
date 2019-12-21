@@ -15,6 +15,8 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier as DTC
+from sklearn.svm import LinearSVC
 from scipy.signal import savgol_filter, butter, lfilter
 from tqdm import tqdm
 from collections import Counter, deque
@@ -185,22 +187,19 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             max_min_difference(eeg1_params.theta),
             max_min_difference(eeg2_params.theta),
             max_min_difference(emg_epoch),
-            *largest_and_smallest_values_average(eeg1_params.filtered),
-            *largest_and_smallest_values_average(eeg2_params.filtered),
-            *largest_and_smallest_values_average(eeg1_params.alpha_low),
-            *largest_and_smallest_values_average(eeg2_params.alpha_low),
-            *largest_and_smallest_values_average(eeg1_params.alpha_high),
-            *largest_and_smallest_values_average(eeg2_params.alpha_high),
-            *largest_and_smallest_values_average(eeg1_params.beta),
-            *largest_and_smallest_values_average(eeg2_params.beta),
-            *largest_and_smallest_values_average(eeg1_params.gamma),
-            *largest_and_smallest_values_average(eeg2_params.gamma),
-            *largest_and_smallest_values_average(eeg1_params.theta),
-            *largest_and_smallest_values_average(eeg2_params.theta),
-            *largest_and_smallest_values_average(emg_epoch),
-            *calculate_percentiles(emg_epoch),
-            *calculate_percentiles(eeg1_params.theta),
-            *calculate_percentiles(eeg2_params.theta),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.filtered),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.filtered),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.alpha_low),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.alpha_low),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.alpha_high),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.alpha_high),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.beta),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.beta),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.gamma),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.gamma),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.theta),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.theta),
+            *largest_and_smallest_values_average_and_percentiles(emg_epoch),
             # frequency features:
             # eeg1_p_positions[0], eeg1_p_heights[0],
             # eeg2_p_positions[0], eeg2_p_heights[0],
@@ -387,17 +386,16 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
 
     # Grid search
-    max_depth = [3] if debug else [7, 9, 11, 13, 17, 23, 27]
+    max_depth = [3] if debug else [7, 11, 13, 17, 23]
     min_samples_split = [5] if debug else [2, 3, 4, 6, 8]
-    n_estimators = [6] if debug else [50, 100, 200, 350, 500, 700]
-
-    knn_neighbors = [3] if debug else [3, 5, 7]
-    knn_weights = ['uniform'] if debug else ['uniform', 'distance']
-    knn_algorithm = ['brute'] if debug else ['kd_tree', ]
-    knn_p = [2] if debug else [1, 2, 3]
-    knn_leaf_size = [30] if debug else [20, 30, 40]
+    n_estimators = [6] if debug else [50, 100, 200, 350, 500]
 
     bagging_n_estimators = [100] if debug else [10, 100, 200, 350, 500]
+    base_classifier_tree = [DTC()] if debug else [
+        DTC(class_weight="balanced", max_depth=3),
+        DTC(class_weight="balanced", max_depth=2),
+        DTC(class_weight="balanced", max_depth=1)
+    ]
 
     k_best_features = [x_train_fsel.shape[1]] if debug else list(
         np.linspace(start=2, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
@@ -414,25 +412,26 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
                 'cm__class_weight': ['balanced'],
             }
         },
-        # {
-        #     'model': KNC,
-        #     'parameters': {
-        #         'fs__k': k_best_features,
-        #         'cm__n_neighbors': knn_neighbors,
-        #         'cm__weights': knn_weights,
-        #         'cm__algorithm': knn_algorithm,
-        #         'cm__leaf_size': knn_leaf_size,
-        #         'cm__p': knn_p
-        #     }
-        # },
-        # {
-        #     'model': BaggingClassifier,
-        #     'parameters': {
-        #         'fs__k': k_best_features,
-        #         'cm__n_estimators': bagging_n_estimators,
-        #         'cm__oob_score': [True],
-        #     }
-        # }
+        {
+            'model': BaggingClassifier,
+            'parameters': {
+                'fs__k': k_best_features,
+                'cm__base_estimator': base_classifier_tree,
+                'cm__n_estimators': bagging_n_estimators,
+                'cm__oob_score': [True],
+            }
+        },
+        {
+            'model': BaggingClassifier,
+            'parameters': {
+                'fs__k': k_best_features,
+                'cm__base_estimator': [
+                    LinearSVC(class_weight="balanced")
+                ],
+                'cm__n_estimators': bagging_n_estimators,
+                'cm__oob_score': [True],
+            }
+        }
     ]
 
     # Perform cross-validation
