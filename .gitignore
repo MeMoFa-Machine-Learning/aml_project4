@@ -106,3 +106,4 @@ output/
 .idea/
 data/
 joblib/
+*.tar.xz

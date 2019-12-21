@@ -140,19 +140,19 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
         eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
         emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
-        # peak positions:
+        # # peak positions:
         eeg1_p_positions, eeg1_p_heights = get_dominant_peaks_position_and_heights(eeg1_freq_peak_positions,eeg1_freq_dict)
         eeg2_p_positions, eeg2_p_heights = get_dominant_peaks_position_and_heights(eeg2_freq_peak_positions,eeg2_freq_dict)
         emg_p_positions, emg_p_heights = get_dominant_peaks_position_and_heights(emg_freq_peak_positions,emg_freq_dict)
-        # plateau positions:
+        # # plateau positions:
         eeg1_plat_positions, eeg1_plat_sizes = get_plateau_positions_and_sizes(eeg1_freq_peak_positions,eeg1_freq_dict)
         eeg2_plat_positions, eeg2_plat_sizes = get_plateau_positions_and_sizes(eeg2_freq_peak_positions,eeg2_freq_dict)
         emg_plat_positions, emg_plat_sizes = get_plateau_positions_and_sizes(emg_freq_peak_positions,emg_freq_dict)
-        # prominences:
+        # # prominences:
         eeg1_prom_positions, eeg1_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg1_freq_peak_positions,eeg1_freq_dict)
         eeg2_prom_positions, eeg2_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg2_freq_peak_positions,eeg2_freq_dict)
         emg_prom_positions, emg_prom_sizes = get_prominent_peaks_positions_and_prominence(emg_freq_peak_positions,emg_freq_dict)
-        # widths:
+        # # widths:
         eeg1_prom_positions = get_widths_of_heighest_peaks(eeg1_freq_peak_positions,eeg1_freq_dict,eeg1_epoch_freq)
         eeg2_prom_positions = get_widths_of_heighest_peaks(eeg2_freq_peak_positions,eeg2_freq_dict,eeg2_epoch_freq)
         emg_prom_positions = get_widths_of_heighest_peaks(emg_freq_peak_positions,emg_freq_dict,emg_epoch_freq)
@@ -161,12 +161,43 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         feature_extracted_samples = (
             *calculate_mean_based_stats(eeg1_params.filtered),
             *calculate_mean_based_stats(eeg2_params.filtered),
+            *calculate_mean_based_stats(eeg1_params.alpha_low),
+            *calculate_mean_based_stats(eeg2_params.alpha_low),
+            *calculate_mean_based_stats(eeg1_params.alpha_high),
+            *calculate_mean_based_stats(eeg2_params.alpha_high),
+            *calculate_mean_based_stats(eeg1_params.beta),
+            *calculate_mean_based_stats(eeg2_params.beta),
+            *calculate_mean_based_stats(eeg1_params.gamma),
+            *calculate_mean_based_stats(eeg2_params.gamma),
+            *calculate_mean_based_stats(eeg1_params.theta),
+            *calculate_mean_based_stats(eeg2_params.theta),
             *calculate_mean_based_stats(emg_epoch),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
+            max_min_difference(eeg1_params.alpha_low),
+            max_min_difference(eeg2_params.alpha_low),
+            max_min_difference(eeg1_params.alpha_high),
+            max_min_difference(eeg2_params.alpha_high),
+            max_min_difference(eeg1_params.beta),
+            max_min_difference(eeg2_params.beta),
+            max_min_difference(eeg1_params.gamma),
+            max_min_difference(eeg2_params.gamma),
             max_min_difference(eeg1_params.theta),
             max_min_difference(eeg2_params.theta),
             max_min_difference(emg_epoch),
+            *largest_and_smallest_values_average(eeg1_params.filtered),
+            *largest_and_smallest_values_average(eeg2_params.filtered),
+            *largest_and_smallest_values_average(eeg1_params.alpha_low),
+            *largest_and_smallest_values_average(eeg2_params.alpha_low),
+            *largest_and_smallest_values_average(eeg1_params.alpha_high),
+            *largest_and_smallest_values_average(eeg2_params.alpha_high),
+            *largest_and_smallest_values_average(eeg1_params.beta),
+            *largest_and_smallest_values_average(eeg2_params.beta),
+            *largest_and_smallest_values_average(eeg1_params.gamma),
+            *largest_and_smallest_values_average(eeg2_params.gamma),
+            *largest_and_smallest_values_average(eeg1_params.theta),
+            *largest_and_smallest_values_average(eeg2_params.theta),
+            *largest_and_smallest_values_average(emg_epoch),
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
             *calculate_percentiles(eeg2_params.theta),
@@ -222,6 +253,7 @@ def down_sample_all_channels(eeg1, eeg2, emg, y_train):
     y_train = y_train[sample_indices_sorted]
     return eeg1, eeg2, emg, y_train, np.argmax(sample_indices_sorted >= individual_3_cutoff_i_orig)
 
+
 def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     if debug:
         hold_out_start_i = int(x.shape[0] * 2 / 3)
@@ -230,6 +262,7 @@ def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
     x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
     return x_gs, y_gs, x_ho, y_ho
+
 
 def fourier_transform(data):
     """transforms the data row-by-row into frequency space
@@ -240,7 +273,6 @@ def fourier_transform(data):
     """
     ft_data = np.fft.fft(data)
     return ft_data 
-
 
 
 def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
@@ -307,7 +339,6 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
-
     # Load raw ECG testing data
     logging.info("Reading in testing data...")
     test_data_eeg1 = read_in_irregular_csv(ospath.join(testing_data_dir, "test_eeg1.csv"), False, debug=debug)
@@ -353,9 +384,9 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
 
     # Grid search
-    max_depth = [3] if debug else [7, 9, 11, ]
+    max_depth = [3] if debug else [7, 9, 11, 13, 17, 23, 27]
     min_samples_split = [5] if debug else [2, 3, 4, 6, 8]
-    n_estimators = [6] if debug else [50, 100, 200, 350, 500]
+    n_estimators = [6] if debug else [50, 100, 200, 350, 500, 700]
 
     knn_neighbors = [3] if debug else [3, 5, 7]
     knn_weights = ['uniform'] if debug else ['uniform', 'distance']
@@ -380,25 +411,25 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
                 'cm__class_weight': ['balanced'],
             }
         },
-        {
-            'model': KNC,
-            'parameters': {
-                'fs__k': k_best_features,
-                'cm__n_neighbors': knn_neighbors,
-                'cm__weights': knn_weights,
-                'cm__algorithm': knn_algorithm,
-                'cm__leaf_size': knn_leaf_size,
-                'cm__p': knn_p
-            }
-        },
-        {
-            'model': BaggingClassifier,
-            'parameters': {
-                'fs__k': k_best_features,
-                'cm__n_estimators': bagging_n_estimators,
-                'cm__oob_score': [True],
-            }
-        }
+        # {
+        #     'model': KNC,
+        #     'parameters': {
+        #         'fs__k': k_best_features,
+        #         'cm__n_neighbors': knn_neighbors,
+        #         'cm__weights': knn_weights,
+        #         'cm__algorithm': knn_algorithm,
+        #         'cm__leaf_size': knn_leaf_size,
+        #         'cm__p': knn_p
+        #     }
+        # },
+        # {
+        #     'model': BaggingClassifier,
+        #     'parameters': {
+        #         'fs__k': k_best_features,
+        #         'cm__n_estimators': bagging_n_estimators,
+        #         'cm__oob_score': [True],
+        #     }
+        # }
     ]
 
     # Perform cross-validation
