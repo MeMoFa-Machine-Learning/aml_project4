@@ -89,6 +89,7 @@ def get_prominent_peaks_positions_and_prominence(peak_positions, peak_dict):
     peak_array[0] = peak_positions
     peak_array[1] = peak_dict["prominences"]
     sorted_desc = peak_array[:, peak_array[1].argsort()]
+    print (sorted_desc[0])
     return sorted_desc[0], sorted_desc[1]
 
 def get_widths_of_heighest_peaks(peak_positions, peak_dict, signal):
@@ -99,12 +100,12 @@ def get_widths_of_heighest_peaks(peak_positions, peak_dict, signal):
     Returns:
         1D-array: List with position of peaks ordered by descending width
     """
+    peak_widths = sp.signal.peak_widths(signal, peak_positions)
     peak_array = np.zeros((2, len(peak_positions))) # array with peak positions and respective heights
-    peak_array[0] = peak_positions
+    peak_array[0] = peak_widths[0]
     peak_array[1] = peak_dict["width_heights"]
     sorted_desc = peak_array[:, peak_array[1].argsort()]
-    peak_widths = sp.signal.peak_widths(signal, sorted_desc[0].astype(int))
-    return peak_widths
+    return peak_array[0]
 
 
 def calculate_skew_kurtosis_difference(signal1, signal2):

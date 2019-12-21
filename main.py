@@ -139,25 +139,25 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
         # extract peak info from frequency signals
-        # eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
-        # eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
-        # emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
+        eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
+        eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
+        emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
         # # peak positions:
-        # eeg1_p_positions, eeg1_p_heights = get_dominant_peaks_position_and_heights(eeg1_freq_peak_positions,eeg1_freq_dict)
-        # eeg2_p_positions, eeg2_p_heights = get_dominant_peaks_position_and_heights(eeg2_freq_peak_positions,eeg2_freq_dict)
-        # emg_p_positions, emg_p_heights = get_dominant_peaks_position_and_heights(emg_freq_peak_positions,emg_freq_dict)
+        eeg1_p_positions, eeg1_p_heights = get_dominant_peaks_position_and_heights(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_p_positions, eeg2_p_heights = get_dominant_peaks_position_and_heights(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_p_positions, emg_p_heights = get_dominant_peaks_position_and_heights(emg_freq_peak_positions,emg_freq_dict)
         # # plateau positions:
-        # eeg1_plat_positions, eeg1_plat_sizes = get_plateau_positions_and_sizes(eeg1_freq_peak_positions,eeg1_freq_dict)
-        # eeg2_plat_positions, eeg2_plat_sizes = get_plateau_positions_and_sizes(eeg2_freq_peak_positions,eeg2_freq_dict)
-        # emg_plat_positions, emg_plat_sizes = get_plateau_positions_and_sizes(emg_freq_peak_positions,emg_freq_dict)
+        eeg1_plat_positions, eeg1_plat_sizes = get_plateau_positions_and_sizes(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_plat_positions, eeg2_plat_sizes = get_plateau_positions_and_sizes(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_plat_positions, emg_plat_sizes = get_plateau_positions_and_sizes(emg_freq_peak_positions,emg_freq_dict)
         # # prominences:
-        # eeg1_prom_positions, eeg1_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg1_freq_peak_positions,eeg1_freq_dict)
-        # eeg2_prom_positions, eeg2_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg2_freq_peak_positions,eeg2_freq_dict)
-        # emg_prom_positions, emg_prom_sizes = get_prominent_peaks_positions_and_prominence(emg_freq_peak_positions,emg_freq_dict)
+        eeg1_prom_positions, eeg1_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg1_freq_peak_positions,eeg1_freq_dict)
+        eeg2_prom_positions, eeg2_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg2_freq_peak_positions,eeg2_freq_dict)
+        emg_prom_positions, emg_prom_sizes = get_prominent_peaks_positions_and_prominence(emg_freq_peak_positions,emg_freq_dict)
         # # widths:
-        # eeg1_prom_positions = get_widths_of_heighest_peaks(eeg1_freq_peak_positions,eeg1_freq_dict,eeg1_epoch_freq)
-        # eeg2_prom_positions = get_widths_of_heighest_peaks(eeg2_freq_peak_positions,eeg2_freq_dict,eeg2_epoch_freq)
-        # emg_prom_positions = get_widths_of_heighest_peaks(emg_freq_peak_positions,emg_freq_dict,emg_epoch_freq)
+        eeg1_prom_positions = get_widths_of_heighest_peaks(eeg1_freq_peak_positions,eeg1_freq_dict,eeg1_epoch_freq)
+        eeg2_prom_positions = get_widths_of_heighest_peaks(eeg2_freq_peak_positions,eeg2_freq_dict,eeg2_epoch_freq)
+        emg_prom_positions = get_widths_of_heighest_peaks(emg_freq_peak_positions,emg_freq_dict,emg_epoch_freq)
 
         # Adding features
         feature_extracted_samples = (
@@ -201,37 +201,34 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *largest_and_smallest_values_average_and_percentiles(eeg2_params.theta),
             *largest_and_smallest_values_average_and_percentiles(emg_epoch),
             # frequency features:
-            # eeg1_p_positions[0], eeg1_p_heights[0],
-            # eeg2_p_positions[0], eeg2_p_heights[0],
-            # emg_p_positions[0], emg_p_heights[0],
-            # eeg1_p_positions[1], eeg1_p_heights[1],
-            # eeg2_p_positions[1], eeg2_p_heights[1],
-            # emg_p_positions[1], emg_p_heights[1],
-            # eeg1_p_positions[2], eeg1_p_heights[2],
-            # eeg2_p_positions[2], eeg2_p_heights[2],
-            # emg_p_positions[2], emg_p_heights[2],
-            # eeg1_plat_positions[0], eeg1_plat_sizes[0],
-            # eeg2_plat_positions[0], eeg2_plat_sizes[0],
-            # emg_plat_positions[0], emg_plat_sizes[0],
-            # eeg1_plat_positions[1], eeg1_plat_sizes[1],
-            # eeg2_plat_positions[1], eeg2_plat_sizes[1],
-            # emg_plat_positions[1], emg_plat_sizes[1],
-            # eeg1_plat_positions[2], eeg1_plat_sizes[2],
-            # eeg2_plat_positions[2], eeg2_plat_sizes[2],
-            # emg_plat_positions[2], emg_plat_sizes[2],
-            # eeg1_prom_positions[0], eeg1_prom_sizes[0],
-            # eeg2_prom_positions[0], eeg2_prom_sizes[0],
-            # emg_prom_positions[0], emg_prom_sizes[0],
-            # eeg1_prom_positions[1], eeg1_prom_sizes[1],
-            # eeg2_prom_positions[1], eeg2_prom_sizes[1],
-            # emg_prom_positions[1], emg_prom_sizes[1],
-            # eeg1_prom_positions[2], eeg1_prom_sizes[2],
-            # eeg2_prom_positions[2], eeg2_prom_sizes[2],
-            # emg_prom_positions[2], emg_prom_sizes[2],
-            # eeg1_prom_positions[0],eeg1_prom_positions[1],eeg1_prom_positions[2],
-            # eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
-            # emg_prom_positions[0],emg_prom_positions[1],emg_prom_positions[2],
-            # some weird stuff ~merel~ *Falko did:
+            eeg1_p_positions[0], eeg1_p_heights[0],
+            eeg2_p_positions[0], eeg2_p_heights[0],
+            emg_p_positions[0], emg_p_heights[0],
+            eeg1_p_positions[1], eeg1_p_heights[1],
+            eeg2_p_positions[1], eeg2_p_heights[1],
+            emg_p_positions[1], emg_p_heights[1],
+            eeg1_p_positions[2], eeg1_p_heights[2],
+            eeg2_p_positions[2], eeg2_p_heights[2],
+            eeg1_plat_positions[0], eeg1_plat_sizes[0],
+            eeg2_plat_positions[0], eeg2_plat_sizes[0],
+            emg_plat_positions[0], emg_plat_sizes[0],
+            eeg1_plat_positions[1], eeg1_plat_sizes[1],
+            eeg2_plat_positions[1], eeg2_plat_sizes[1],
+            emg_plat_positions[1], emg_plat_sizes[1],
+            eeg1_plat_positions[2], eeg1_plat_sizes[2],
+            eeg2_plat_positions[2], eeg2_plat_sizes[2],
+            eeg1_prom_positions[0], eeg1_prom_sizes[0],
+            eeg2_prom_positions[0], eeg2_prom_sizes[0],
+            emg_prom_positions[0], emg_prom_sizes[0],
+            eeg1_prom_positions[1], eeg1_prom_sizes[1],
+            eeg2_prom_positions[1], eeg2_prom_sizes[1],
+            emg_prom_positions[1], emg_prom_sizes[1],
+            eeg1_prom_positions[2], eeg1_prom_sizes[2],
+            eeg2_prom_positions[2], eeg2_prom_sizes[2],
+            eeg1_prom_positions[0],eeg1_prom_positions[1],eeg1_prom_positions[2],
+            eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
+            emg_prom_positions[0],emg_prom_positions[1]
+            # some weird stuff merel did:
             *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
             *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
             *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
