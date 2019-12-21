@@ -179,7 +179,6 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             emg_p_positions[1], emg_p_heights[1],
             eeg1_p_positions[2], eeg1_p_heights[2],
             eeg2_p_positions[2], eeg2_p_heights[2],
-            emg_p_positions[2], emg_p_heights[2],
             eeg1_plat_positions[0], eeg1_plat_sizes[0],
             eeg2_plat_positions[0], eeg2_plat_sizes[0],
             emg_plat_positions[0], emg_plat_sizes[0],
@@ -188,7 +187,6 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             emg_plat_positions[1], emg_plat_sizes[1],
             eeg1_plat_positions[2], eeg1_plat_sizes[2],
             eeg2_plat_positions[2], eeg2_plat_sizes[2],
-            emg_plat_positions[2], emg_plat_sizes[2],
             eeg1_prom_positions[0], eeg1_prom_sizes[0],
             eeg2_prom_positions[0], eeg2_prom_sizes[0],
             emg_prom_positions[0], emg_prom_sizes[0],
@@ -197,10 +195,9 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             emg_prom_positions[1], emg_prom_sizes[1],
             eeg1_prom_positions[2], eeg1_prom_sizes[2],
             eeg2_prom_positions[2], eeg2_prom_sizes[2],
-            emg_prom_positions[2], emg_prom_sizes[2],
             eeg1_prom_positions[0],eeg1_prom_positions[1],eeg1_prom_positions[2],
             eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
-            emg_prom_positions[0],emg_prom_positions[1],emg_prom_positions[2],
+            emg_prom_positions[0],emg_prom_positions[1]
             # some weird stuff merel did:
             *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
             *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
