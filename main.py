@@ -22,7 +22,7 @@ from collections import Counter, deque
 from helpers.helpers import EegStore, EmgStore
 from helpers.feature_extraction import *
 from imblearn.under_sampling import RandomUnderSampler
-from PyEMD import CEEMDAN
+# from PyEMD import CEEMDAN
 from scipy.fftpack import fft
 # For supressing warnings
 from warnings import simplefilter
@@ -123,7 +123,7 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
-    ceemdan = CEEMDAN(trials=1)
+    # ceemdan = CEEMDAN(trials=1)
 
     # Setup initial prev variables
     eeg1_epoch_prev = EegStore(*eeg.eeg(signal=eeg1[-1].reshape((eeg1[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
@@ -374,8 +374,8 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
 
     # Extract features of training set
     logging.info("Extracting features...")
-    trials = 5
-    ceemdan = CEEMDAN(trials=trials)
+    # trials = 5
+    # ceemdan = CEEMDAN(trials=trials)
     x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg,
                                            show_graphs=show_graphs)
     logging.info("Finished extracting features")
