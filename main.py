@@ -21,6 +21,8 @@ from collections import Counter, deque
 from helpers.helpers import EegStore, EmgStore
 from helpers.feature_extraction import *
 from imblearn.under_sampling import RandomUnderSampler
+from PyEMD import CEEMDAN
+import pylab as plt
 
 import logging
 
@@ -113,9 +115,15 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
+    ceemdan = CEEMDAN(trials=1)
     for eeg1_epoch in tqdm(eeg1):
+        eeg1_IMFs = ceemdan(eeg1_epoch)
+        # plt.plot(C_IMFs[0])
+        # plt.show()
         eeg2_epoch = eeg2.popleft()
+        eeg2_IMFs = ceemdan(eeg2_epoch)
         emg_epoch = emg1.popleft()
+        emg_IMFs = ceemdan(emg_epoch)
         if show_graphs:
             eeg_comb = np.concatenate((eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)),
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
@@ -130,14 +138,25 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *calculate_mean_based_stats(eeg1_params.filtered),
             *calculate_mean_based_stats(eeg2_params.filtered),
             *calculate_mean_based_stats(emg_epoch),
+            *calculate_mean_based_stats(eeg1_IMFs[0]),
+            *calculate_mean_based_stats(eeg2_IMFs[0]),
+            *calculate_mean_based_stats(emg_IMFs[0]),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
             max_min_difference(eeg1_params.theta),
             max_min_difference(eeg2_params.theta),
             max_min_difference(emg_epoch),
+            max_min_difference(eeg1_IMFs[0]),
+            max_min_difference(eeg2_IMFs[0]),
+            max_min_difference(emg_IMFs[0]),
+            *calculate_percentiles(eeg1_params.filtered),
+            *calculate_percentiles(eeg2_params.filtered),
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
-            *calculate_percentiles(eeg2_params.theta)
+            *calculate_percentiles(eeg2_params.theta),
+            *calculate_percentiles(eeg1_IMFs[0]),
+            *calculate_percentiles(eeg2_IMFs[0]),
+            *calculate_percentiles(emg_IMFs[0])
         )
 
         manual_features_array.append(feature_extracted_samples)
@@ -226,7 +245,10 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
 
     # Extract features of training set
     logging.info("Extracting features...")
-    x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg, show_graphs=show_graphs)
+    trials = 5
+    ceemdan = CEEMDAN(trials=trials)
+    x_train_fsel = extract_manual_features(train_smoothed_eeg1, train_smoothed_eeg2, train_smoothed_emg,
+                                           show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
     # Load raw ECG testing data
@@ -267,7 +289,8 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
 
     # Extract features of testing set
     logging.info("Extracting features...")
-    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg, show_graphs=show_graphs)
+    x_test_fsel = extract_manual_features(test_smoothed_eeg1, test_smoothed_eeg2, test_smoothed_emg,
+                                          show_graphs=show_graphs)
     logging.info("Finished extracting features")
 
     # Pre-processing step for meta-feature calculation: StandardScaler
