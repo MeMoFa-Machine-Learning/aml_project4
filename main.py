@@ -8,13 +8,14 @@ from csv import reader
 import biosppy.signals.eeg as eeg
 import biosppy.signals.emg as emg
 from sklearn.feature_selection import SelectKBest
-from sklearn.neighbors import KNeighborsClassifier as KNC
 from sklearn.ensemble import RandomForestClassifier, BaggingClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import balanced_accuracy_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier as DTC
+from sklearn.svm import LinearSVC
 from scipy.signal import savgol_filter, butter, lfilter
 from tqdm import tqdm
 from collections import Counter, deque
@@ -23,6 +24,13 @@ from helpers.feature_extraction import *
 from imblearn.under_sampling import RandomUnderSampler
 from PyEMD import CEEMDAN
 import pylab as plt
+# For supressing warnings
+from warnings import simplefilter
+import sys
+import os
+if not sys.warnoptions:
+    simplefilter("ignore")
+    os.environ["PYTHONWARNINGS"] = "ignore"  # Also affects sub-processes
 
 import logging
 
@@ -34,7 +42,7 @@ individual_3_cutoff_i_orig = 43200
 max_individual_amount = 21600
 
 # Debug parameters
-first_n_lines_input = 2000
+first_n_lines_input = 500
 first_n_lines_input = int(first_n_lines_input / 3) * 3
 
 
@@ -116,6 +124,12 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order=5):
 def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     manual_features_array = deque()
     ceemdan = CEEMDAN(trials=1)
+
+    # Setup initial prev variables
+    eeg1_epoch_prev = EegStore(*eeg.eeg(signal=eeg1[-1].reshape((eeg1[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    eeg2_epoch_prev = EegStore(*eeg.eeg(signal=eeg2[-1].reshape((eeg2[-1].shape[0], 1)), sampling_rate=128, show=False)).filtered
+    emg_epoch_prev = emg1[-1]
+
     for eeg1_epoch in tqdm(eeg1):
         eeg1_IMFs = ceemdan(eeg1_epoch)
         # plt.plot(C_IMFs[0])
@@ -124,6 +138,12 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg2_IMFs = ceemdan(eeg2_epoch)
         emg_epoch = emg1.popleft()
         emg_IMFs = ceemdan(emg_epoch)
+
+        # fourier-transform signals:
+        eeg1_epoch_freq = fourier_transform(eeg1_epoch)
+        eeg2_epoch_freq = fourier_transform(eeg2_epoch)
+        emg_epoch_freq = fourier_transform(emg_epoch)
+
         if show_graphs:
             eeg_comb = np.concatenate((eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)),
                                        eeg2_epoch.reshape((eeg2_epoch.shape[0], 1))), axis=1)
@@ -133,16 +153,55 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
         eeg2_params = EegStore(*eeg.eeg(signal=eeg2_epoch.reshape((eeg2_epoch.shape[0], 1)), sampling_rate=128, show=False))
         # emg_params = EmgStore(*emg.emg(signal=emg1[i], sampling_rate=128, show=False)) TODO: Try to find work-around
 
+        # # extract peak info from frequency signals
+        # eeg1_freq_peak_positions, eeg1_freq_dict = extract_peaks(eeg1_epoch_freq)
+        # eeg2_freq_peak_positions, eeg2_freq_dict = extract_peaks(eeg2_epoch_freq)
+        # emg_freq_peak_positions, emg_freq_dict = extract_peaks(emg_epoch_freq)
+        # # # peak positions:
+        # eeg1_p_positions, eeg1_p_heights = get_dominant_peaks_position_and_heights(eeg1_freq_peak_positions,eeg1_freq_dict)
+        # eeg2_p_positions, eeg2_p_heights = get_dominant_peaks_position_and_heights(eeg2_freq_peak_positions,eeg2_freq_dict)
+        # emg_p_positions, emg_p_heights = get_dominant_peaks_position_and_heights(emg_freq_peak_positions,emg_freq_dict)
+        # # # plateau positions:
+        # eeg1_plat_positions, eeg1_plat_sizes = get_plateau_positions_and_sizes(eeg1_freq_peak_positions,eeg1_freq_dict)
+        # eeg2_plat_positions, eeg2_plat_sizes = get_plateau_positions_and_sizes(eeg2_freq_peak_positions,eeg2_freq_dict)
+        # emg_plat_positions, emg_plat_sizes = get_plateau_positions_and_sizes(emg_freq_peak_positions,emg_freq_dict)
+        # # # prominences:
+        # eeg1_prom_positions, eeg1_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg1_freq_peak_positions,eeg1_freq_dict)
+        # eeg2_prom_positions, eeg2_prom_sizes = get_prominent_peaks_positions_and_prominence(eeg2_freq_peak_positions,eeg2_freq_dict)
+        # emg_prom_positions, emg_prom_sizes = get_prominent_peaks_positions_and_prominence(emg_freq_peak_positions,emg_freq_dict)
+        # # # widths:
+        # eeg1_prom_positions = get_widths_of_heighest_peaks(eeg1_freq_peak_positions,eeg1_freq_dict,eeg1_epoch_freq)
+        # eeg2_prom_positions = get_widths_of_heighest_peaks(eeg2_freq_peak_positions,eeg2_freq_dict,eeg2_epoch_freq)
+        # emg_prom_positions = get_widths_of_heighest_peaks(emg_freq_peak_positions,emg_freq_dict,emg_epoch_freq)
+
         # Adding features
         feature_extracted_samples = (
             *calculate_mean_based_stats(eeg1_params.filtered),
             *calculate_mean_based_stats(eeg2_params.filtered),
+            *calculate_mean_based_stats(eeg1_params.alpha_low),
+            *calculate_mean_based_stats(eeg2_params.alpha_low),
+            *calculate_mean_based_stats(eeg1_params.alpha_high),
+            *calculate_mean_based_stats(eeg2_params.alpha_high),
+            *calculate_mean_based_stats(eeg1_params.beta),
+            *calculate_mean_based_stats(eeg2_params.beta),
+            *calculate_mean_based_stats(eeg1_params.gamma),
+            *calculate_mean_based_stats(eeg2_params.gamma),
+            *calculate_mean_based_stats(eeg1_params.theta),
+            *calculate_mean_based_stats(eeg2_params.theta),
             *calculate_mean_based_stats(emg_epoch),
             *calculate_mean_based_stats(eeg1_IMFs[0]),
             *calculate_mean_based_stats(eeg2_IMFs[0]),
             *calculate_mean_based_stats(emg_IMFs[0]),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
+            max_min_difference(eeg1_params.alpha_low),
+            max_min_difference(eeg2_params.alpha_low),
+            max_min_difference(eeg1_params.alpha_high),
+            max_min_difference(eeg2_params.alpha_high),
+            max_min_difference(eeg1_params.beta),
+            max_min_difference(eeg2_params.beta),
+            max_min_difference(eeg1_params.gamma),
+            max_min_difference(eeg2_params.gamma),
             max_min_difference(eeg1_params.theta),
             max_min_difference(eeg2_params.theta),
             max_min_difference(emg_epoch),
@@ -157,14 +216,67 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *calculate_percentiles(eeg1_IMFs[0]),
             *calculate_percentiles(eeg2_IMFs[0]),
             *calculate_percentiles(emg_IMFs[0])
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.filtered),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.filtered),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.alpha_low),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.alpha_low),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.alpha_high),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.alpha_high),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.beta),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.beta),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.gamma),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.gamma),
+            *largest_and_smallest_values_average_and_percentiles(eeg1_params.theta),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_params.theta),
+            *largest_and_smallest_values_average_and_percentiles(emg_epoch),
+            # frequency features:
+            # eeg1_p_positions[0], eeg1_p_heights[0],
+            # eeg2_p_positions[0], eeg2_p_heights[0],
+            # emg_p_positions[0], emg_p_heights[0],
+            # eeg1_p_positions[1], eeg1_p_heights[1],
+            # eeg2_p_positions[1], eeg2_p_heights[1],
+            # emg_p_positions[1], emg_p_heights[1],
+            # eeg1_p_positions[2], eeg1_p_heights[2],
+            # eeg2_p_positions[2], eeg2_p_heights[2],
+            # eeg1_plat_positions[0], eeg1_plat_sizes[0],
+            # eeg2_plat_positions[0], eeg2_plat_sizes[0],
+            # emg_plat_positions[0], emg_plat_sizes[0],
+            # eeg1_plat_positions[1], eeg1_plat_sizes[1],
+            # eeg2_plat_positions[1], eeg2_plat_sizes[1],
+            # emg_plat_positions[1], emg_plat_sizes[1],
+            # eeg1_plat_positions[2], eeg1_plat_sizes[2],
+            # eeg2_plat_positions[2], eeg2_plat_sizes[2],
+            # eeg1_prom_positions[0], eeg1_prom_sizes[0],
+            # eeg2_prom_positions[0], eeg2_prom_sizes[0],
+            # emg_prom_positions[0], emg_prom_sizes[0],
+            # eeg1_prom_positions[1], eeg1_prom_sizes[1],
+            # eeg2_prom_positions[1], eeg2_prom_sizes[1],
+            # emg_prom_positions[1], emg_prom_sizes[1],
+            # eeg1_prom_positions[2], eeg1_prom_sizes[2],
+            # eeg2_prom_positions[2], eeg2_prom_sizes[2],
+            # eeg1_prom_positions[0],eeg1_prom_positions[1],eeg1_prom_positions[2],
+            # eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
+            # emg_prom_positions[0],emg_prom_positions[1],
+            # some weird stuff merel did:
+            *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
+            *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
+            *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
         )
+
+        eeg1_epoch_prev = eeg1_params.filtered
+        eeg2_epoch_prev = eeg2_params.filtered
+        emg_epoch_prev = emg_epoch_prev
 
         manual_features_array.append(feature_extracted_samples)
     return np.array(manual_features_array)
 
 
 def down_sample_all_channels(eeg1, eeg2, emg, y_train):
-    rus = RandomUnderSampler(sampling_strategy="auto", random_state=42)
+    num_3 = Counter(y_train)[3]
+    num_2 = int(num_3 * 2.8)
+    num_1 = int(num_3 * 3.1)
+    resampled_fractions = dict([(1, num_1), (2, num_2), (3, num_3)])
+    rus = RandomUnderSampler(sampling_strategy=resampled_fractions, random_state=42)
     rus.fit_resample(eeg1, y_train)
     sample_indices_sorted = np.sort(rus.sample_indices_)
     eeg1 = eeg1[sample_indices_sorted]
@@ -182,6 +294,17 @@ def train_test_split_by_individual(x, y, person_3_cutoff_i, debug=False):
     x_gs, y_gs = x[:hold_out_start_i, :], y[:hold_out_start_i]
     x_ho, y_ho = x[hold_out_start_i:, :], y[hold_out_start_i:]
     return x_gs, y_gs, x_ho, y_ho
+
+
+def fourier_transform(data):
+    """transforms the data row-by-row into frequency space
+    Args:
+        data (2D numpy array): time-domain data of EEG, ECG and EMG signals
+    Returns:
+        2D numpy array: fourier-transformed data
+    """
+    ft_data = np.fft.fft(data)
+    return ft_data 
 
 
 def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
@@ -297,17 +420,16 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
     x_train_fsel, x_test_fsel = perform_data_scaling(x_train_fsel, x_test_fsel)
 
     # Grid search
-    max_depth = [3] if debug else [7, 9, 11, ]
+    max_depth = [3] if debug else [7, 11, 13, 17, 23]
     min_samples_split = [5] if debug else [2, 3, 4, 6, 8]
     n_estimators = [6] if debug else [50, 100, 200, 350, 500]
 
-    knn_neighbors = [3] if debug else [3, 5, 7]
-    knn_weights = ['uniform'] if debug else ['uniform', 'distance']
-    knn_algorithm = ['brute'] if debug else ['kd_tree', ]
-    knn_p = [2] if debug else [1, 2, 3]
-    knn_leaf_size = [30] if debug else [20, 30, 40]
-
     bagging_n_estimators = [100] if debug else [10, 100, 200, 350, 500]
+    base_classifier_tree = [DTC()] if debug else [
+        DTC(class_weight="balanced", max_depth=3),
+        DTC(class_weight="balanced", max_depth=2),
+        DTC(class_weight="balanced", max_depth=1)
+    ]
 
     k_best_features = [x_train_fsel.shape[1]] if debug else list(
         np.linspace(start=2, stop=x_train_fsel.shape[1], num=5, endpoint=True, dtype=int))
@@ -325,20 +447,21 @@ def main(debug=False, show_graphs=False, downsample=True, outfile="out.csv"):
             }
         },
         {
-            'model': KNC,
+            'model': BaggingClassifier,
             'parameters': {
                 'fs__k': k_best_features,
-                'cm__n_neighbors': knn_neighbors,
-                'cm__weights': knn_weights,
-                'cm__algorithm': knn_algorithm,
-                'cm__leaf_size': knn_leaf_size,
-                'cm__p': knn_p
+                'cm__base_estimator': base_classifier_tree,
+                'cm__n_estimators': bagging_n_estimators,
+                'cm__oob_score': [True],
             }
         },
         {
             'model': BaggingClassifier,
             'parameters': {
                 'fs__k': k_best_features,
+                'cm__base_estimator': [
+                    LinearSVC(class_weight="balanced", max_iter=100)
+                ],
                 'cm__n_estimators': bagging_n_estimators,
                 'cm__oob_score': [True],
             }
