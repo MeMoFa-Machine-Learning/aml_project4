@@ -1,6 +1,7 @@
 import numpy as np
 import scipy as sp
 from scipy.stats import kurtosis, skew
+from scipy.fftpack import fft
 
 
 def calculate_percentiles(values):
@@ -128,3 +129,10 @@ def largest_and_smallest_values_average_and_percentiles(signal1):
     n75 = sorted_signal[int(len(sorted_signal) * 0.75)]
     n95 = sorted_signal[int(len(sorted_signal) * 0.95)]
     return [np.average(sorted_signal[:3]), np.average(sorted_signal[-3:]), n5, n25, n50, n75, n95]
+
+
+def fourier_amplitudes(signal1):
+    n_samples = 512
+    signalf = fft(signal1)
+    signal_amplitudes = 2 / n_samples * np.abs(signalf)
+    return signal_amplitudes
