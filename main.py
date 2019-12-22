@@ -23,7 +23,7 @@ from helpers.helpers import EegStore, EmgStore
 from helpers.feature_extraction import *
 from imblearn.under_sampling import RandomUnderSampler
 from PyEMD import CEEMDAN
-import pylab as plt
+from scipy.fftpack import fft
 # For supressing warnings
 from warnings import simplefilter
 import sys
@@ -131,18 +131,21 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
     emg_epoch_prev = emg1[-1]
 
     for eeg1_epoch in tqdm(eeg1):
-        eeg1_IMFs = ceemdan(eeg1_epoch)
-        # plt.plot(C_IMFs[0])
-        # plt.show()
+        # eeg1_IMFs = ceemdan(eeg1_epoch)
+        # # plt.plot(C_IMFs[0])
+        # # plt.show()
         eeg2_epoch = eeg2.popleft()
-        eeg2_IMFs = ceemdan(eeg2_epoch)
+        # eeg2_IMFs = ceemdan(eeg2_epoch)
         emg_epoch = emg1.popleft()
-        emg_IMFs = ceemdan(emg_epoch)
+        # emg_IMFs = ceemdan(emg_epoch)
+        eeg1_amplitudes = fourier_amplitudes(eeg1_epoch)
+        eeg2_amplitudes = fourier_amplitudes(eeg2_epoch)
+        emg_amplitudes = fourier_amplitudes(emg_epoch)
 
         # fourier-transform signals:
-        eeg1_epoch_freq = fourier_transform(eeg1_epoch)
-        eeg2_epoch_freq = fourier_transform(eeg2_epoch)
-        emg_epoch_freq = fourier_transform(emg_epoch)
+        # eeg1_epoch_freq = fourier_transform(eeg1_epoch)
+        # eeg2_epoch_freq = fourier_transform(eeg2_epoch)
+        # emg_epoch_freq = fourier_transform(emg_epoch)
 
         if show_graphs:
             eeg_comb = np.concatenate((eeg1_epoch.reshape((eeg1_epoch.shape[0], 1)),
@@ -189,9 +192,9 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             *calculate_mean_based_stats(eeg1_params.theta),
             *calculate_mean_based_stats(eeg2_params.theta),
             *calculate_mean_based_stats(emg_epoch),
-            *calculate_mean_based_stats(eeg1_IMFs[0]),
-            *calculate_mean_based_stats(eeg2_IMFs[0]),
-            *calculate_mean_based_stats(emg_IMFs[0]),
+            # *calculate_mean_based_stats(eeg1_IMFs[0]),
+            # *calculate_mean_based_stats(eeg2_IMFs[0]),
+            # *calculate_mean_based_stats(emg_IMFs[0]),
             max_min_difference(eeg1_params.filtered),
             max_min_difference(eeg2_params.filtered),
             max_min_difference(eeg1_params.alpha_low),
@@ -205,17 +208,17 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             max_min_difference(eeg1_params.theta),
             max_min_difference(eeg2_params.theta),
             max_min_difference(emg_epoch),
-            max_min_difference(eeg1_IMFs[0]),
-            max_min_difference(eeg2_IMFs[0]),
-            max_min_difference(emg_IMFs[0]),
+            # max_min_difference(eeg1_IMFs[0]),
+            # max_min_difference(eeg2_IMFs[0]),
+            # max_min_difference(emg_IMFs[0]),
             *calculate_percentiles(eeg1_params.filtered),
             *calculate_percentiles(eeg2_params.filtered),
             *calculate_percentiles(emg_epoch),
             *calculate_percentiles(eeg1_params.theta),
             *calculate_percentiles(eeg2_params.theta),
-            *calculate_percentiles(eeg1_IMFs[0]),
-            *calculate_percentiles(eeg2_IMFs[0]),
-            *calculate_percentiles(emg_IMFs[0])
+            # *calculate_percentiles(eeg1_IMFs[0]),
+            # *calculate_percentiles(eeg2_IMFs[0]),
+            # *calculate_percentiles(emg_IMFs[0])
             *largest_and_smallest_values_average_and_percentiles(eeg1_params.filtered),
             *largest_and_smallest_values_average_and_percentiles(eeg2_params.filtered),
             *largest_and_smallest_values_average_and_percentiles(eeg1_params.alpha_low),
@@ -258,6 +261,9 @@ def extract_manual_features(eeg1, eeg2, emg1, show_graphs=False):
             # eeg2_prom_positions[0],eeg2_prom_positions[1],eeg2_prom_positions[2],
             # emg_prom_positions[0],emg_prom_positions[1],
             # some weird stuff merel did:
+            *largest_and_smallest_values_average_and_percentiles(eeg1_amplitudes),
+            *largest_and_smallest_values_average_and_percentiles(eeg2_amplitudes),
+            *largest_and_smallest_values_average_and_percentiles(emg_amplitudes),
             *calculate_skew_kurtosis_difference(eeg1_params.filtered, eeg1_epoch_prev),
             *calculate_skew_kurtosis_difference(eeg2_params.filtered, eeg2_epoch_prev),
             *calculate_skew_kurtosis_difference_emg(emg_epoch, emg_epoch_prev),
